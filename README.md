@@ -43,10 +43,10 @@ cd llmux
 go build -o llmux .
 ```
 
-**Custom install directory:**
+**Custom install directory** (default: `~/.local/bin`)**:**
 
 ```bash
-INSTALL_DIR=~/.local/bin curl -fsSL https://raw.githubusercontent.com/alansikora/llmux/main/install.sh | sh
+INSTALL_DIR=/usr/local/bin curl -fsSL https://raw.githubusercontent.com/alansikora/llmux/main/install.sh | sudo sh
 ```
 
 </details>

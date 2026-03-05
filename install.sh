@@ -2,7 +2,7 @@
 set -e
 
 REPO="alansikora/llmux"
-INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 
 detect_os() {
   case "$(uname -s)" in
@@ -38,12 +38,24 @@ curl -fsSL -o "${TMPDIR}/${ARCHIVE}" "${URL}"
 
 tar -xzf "${TMPDIR}/${ARCHIVE}" -C "${TMPDIR}"
 
-echo "Installing to ${INSTALL_DIR}/llmux..."
-install -d "${INSTALL_DIR}"
-install "${TMPDIR}/llmux" "${INSTALL_DIR}/llmux"
+mkdir -p "${INSTALL_DIR}"
+cp "${TMPDIR}/llmux" "${INSTALL_DIR}/llmux"
+chmod +x "${INSTALL_DIR}/llmux"
 
-echo "llmux ${VERSION} installed successfully."
+echo "llmux ${VERSION} installed to ${INSTALL_DIR}/llmux"
 echo ""
+
+case ":${PATH}:" in
+  *:"${INSTALL_DIR}":*) ;;
+  *)
+    echo "Warning: ${INSTALL_DIR} is not in your PATH."
+    echo "Add this to your shell rc file:"
+    echo ""
+    echo "  export PATH=\"${INSTALL_DIR}:\$PATH\""
+    echo ""
+    ;;
+esac
+
 echo "Get started:"
 echo "  llmux init zsh   # or bash, fish"
 echo "  llmux"
