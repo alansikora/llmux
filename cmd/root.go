@@ -10,6 +10,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var Version = "dev"
+
 var rootCmd = &cobra.Command{
 	Use:   "llmux",
 	Short: "Claude workspace manager",
@@ -31,5 +33,6 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() error {
+	rootCmd.Version = Version
 	return rootCmd.Execute()
 }

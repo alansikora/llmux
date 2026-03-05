@@ -13,15 +13,7 @@ Claude Code stores everything in `~/.claude`. If you work across multiple projec
 ## Install
 
 ```bash
-go install github.com/allskar/llmux@latest
-```
-
-Or build from source:
-
-```bash
-git clone https://github.com/alansikora/llmux.git
-cd llmux
-go build -o llmux .
+curl -fsSL https://raw.githubusercontent.com/alansikora/llmux/main/install.sh | sh
 ```
 
 Then set up shell integration:
@@ -33,6 +25,31 @@ llmux init fish   # writes to ~/.config/fish/config.fish
 ```
 
 Restart your shell, and you're done.
+
+<details>
+<summary>Other install methods</summary>
+
+**With Go:**
+
+```bash
+go install github.com/allskar/llmux@latest
+```
+
+**From source:**
+
+```bash
+git clone https://github.com/alansikora/llmux.git
+cd llmux
+go build -o llmux .
+```
+
+**Custom install directory:**
+
+```bash
+INSTALL_DIR=~/.local/bin curl -fsSL https://raw.githubusercontent.com/alansikora/llmux/main/install.sh | sh
+```
+
+</details>
 
 ## Usage
 
