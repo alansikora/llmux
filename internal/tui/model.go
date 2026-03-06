@@ -146,6 +146,16 @@ func (m *Model) applyAdd() {
 	if err := m.cfg.Add(name, abs); err != nil {
 		return
 	}
+
+	if m.addData.APIKey != "" {
+		for i := range m.cfg.Workspaces {
+			if m.cfg.Workspaces[i].Name == name {
+				m.cfg.Workspaces[i].APIKey = m.addData.APIKey
+				break
+			}
+		}
+	}
+
 	config.Save(m.cfg)
 
 	settings := map[string]any{}

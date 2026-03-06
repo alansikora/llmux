@@ -20,12 +20,15 @@ var resolveCmd = &cobra.Command{
 			return err
 		}
 
-		dir, err := cfg.Resolve(args[0])
+		result, err := cfg.Resolve(args[0])
 		if err != nil {
 			return err
 		}
 
-		fmt.Print(dir)
+		fmt.Print(result.SessionDir)
+		if result.APIKey != "" {
+			fmt.Print("\n" + result.APIKey)
+		}
 		return nil
 	},
 }
