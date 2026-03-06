@@ -9,10 +9,11 @@ import (
 )
 
 type addFormData struct {
-	FolderPath       string
-	Name             string
+	FolderPath         string
+	Name               string
+	APIKey             string
 	DisableAttribution bool
-	Confirm          bool
+	Confirm            bool
 }
 
 func expandPath(p string) string {
@@ -49,6 +50,11 @@ func newAddForm(data *addFormData) *huh.Form {
 				Title("Workspace name").
 				Placeholder("(defaults to folder name)").
 				Value(&data.Name),
+			huh.NewInput().
+				Title("Anthropic API key").
+				Placeholder("(optional, uses existing env if empty)").
+				EchoMode(huh.EchoModePassword).
+				Value(&data.APIKey),
 			huh.NewConfirm().
 				Title("Disable commit/PR attributions?").
 				Description("Removes \"Made with Claude Code\" from commits and PRs").

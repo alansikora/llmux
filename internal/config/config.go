@@ -7,12 +7,18 @@ import (
 )
 
 type Workspace struct {
-	Name string `json:"name"`
-	Path string `json:"path"`
+	Name   string `json:"name"`
+	Path   string `json:"path"`
+	APIKey string `json:"api_key,omitempty"`
 }
 
 type Config struct {
 	Workspaces []Workspace `json:"workspaces"`
+}
+
+type ResolveResult struct {
+	SessionDir string
+	APIKey     string
 }
 
 func (c *Config) Add(name, path string) error {
@@ -45,9 +51,10 @@ func (c *Config) Remove(name string) error {
 	return fmt.Errorf("workspace %q not found", name)
 }
 
-// Resolve returns the session directory for the workspace that best matches
-// the given path using longest-prefix match with path-separator boundary.
-func (c *Config) Resolve(dir string) (string, error) {
+// Resolve returns the session directory and optional API key for the workspace
+// that best matches the given path using longest-prefix match with
+// path-separator boundary.
+func (c *Config) Resolve(dir string) (ResolveResult, error) {
 	dir = filepath.Clean(dir)
 
 	var best *Workspace
@@ -64,8 +71,11 @@ func (c *Config) Resolve(dir string) (string, error) {
 	}
 
 	if best == nil {
-		return "", fmt.Errorf("no workspace configured for %s", dir)
+		return ResolveResult{}, fmt.Errorf("no workspace configured for %s", dir)
 	}
 
-	return SessionDir(best.Name), nil
+	return ResolveResult{
+		SessionDir: SessionDir(best.Name),
+		APIKey:     best.APIKey,
+	}, nil
 }

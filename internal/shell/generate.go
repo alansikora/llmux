@@ -26,26 +26,37 @@ func rcFile(sh string) (string, error) {
 
 func snippet(bin string) string {
 	return fmt.Sprintf(`claude() {
-  local config_dir
-  config_dir="$(%s resolve "$(pwd -P)")"
+  local resolve_output config_dir api_key
+  resolve_output="$(%s resolve "$(pwd -P)")"
   if [ $? -ne 0 ]; then
     echo "llmux: no workspace configured for $(pwd -P)" >&2
     echo "Run 'llmux' to manage workspaces." >&2
     return 1
   fi
-  CLAUDE_CONFIG_DIR="$config_dir" command claude "$@"
+  config_dir="$(echo "$resolve_output" | head -n1)"
+  api_key="$(echo "$resolve_output" | sed -n '2p')"
+  if [ -n "$api_key" ]; then
+    ANTHROPIC_API_KEY="$api_key" CLAUDE_CONFIG_DIR="$config_dir" command claude "$@"
+  else
+    CLAUDE_CONFIG_DIR="$config_dir" command claude "$@"
+  fi
 }`, bin)
 }
 
 func fishSnippet(bin string) string {
 	return fmt.Sprintf(`function claude
-  set -l config_dir (%s resolve (pwd -P))
+  set -l resolve_output (string split \n (%s resolve (pwd -P)))
   if test $status -ne 0
     echo "llmux: no workspace configured for "(pwd -P) >&2
     echo "Run 'llmux' to manage workspaces." >&2
     return 1
   end
-  CLAUDE_CONFIG_DIR=$config_dir command claude $argv
+  set -l config_dir $resolve_output[1]
+  if test (count $resolve_output) -ge 2; and test -n "$resolve_output[2]"
+    ANTHROPIC_API_KEY=$resolve_output[2] CLAUDE_CONFIG_DIR=$config_dir command claude $argv
+  else
+    CLAUDE_CONFIG_DIR=$config_dir command claude $argv
+  end
 end`, bin)
 }
 
