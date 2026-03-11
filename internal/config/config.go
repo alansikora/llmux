@@ -7,9 +7,10 @@ import (
 )
 
 type Workspace struct {
-	Name   string `json:"name"`
-	Path   string `json:"path"`
-	APIKey string `json:"api_key,omitempty"`
+	Name     string `json:"name"`
+	Path     string `json:"path"`
+	APIKey   string `json:"api_key,omitempty"`
+	Worktree bool   `json:"worktree,omitempty"`
 }
 
 type Config struct {
@@ -20,6 +21,7 @@ type Config struct {
 type ResolveResult struct {
 	SessionDir string
 	APIKey     string
+	Worktree   bool
 }
 
 func (c *Config) Add(name, path string) error {
@@ -78,6 +80,7 @@ func (c *Config) Resolve(dir string) (ResolveResult, error) {
 					return ResolveResult{
 						SessionDir: SessionDir(c.Workspaces[i].Name),
 						APIKey:     c.Workspaces[i].APIKey,
+						Worktree:   c.Workspaces[i].Worktree,
 					}, nil
 				}
 			}
@@ -88,6 +91,7 @@ func (c *Config) Resolve(dir string) (ResolveResult, error) {
 	return ResolveResult{
 		SessionDir: SessionDir(best.Name),
 		APIKey:     best.APIKey,
+		Worktree:   best.Worktree,
 	}, nil
 }
 

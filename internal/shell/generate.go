@@ -26,7 +26,7 @@ func rcFile(sh string) (string, error) {
 
 func snippet(bin string) string {
 	return fmt.Sprintf(`claude() {
-  local resolve_output config_dir api_key
+  local resolve_output config_dir api_key worktree_flag
   resolve_output="$(%s resolve "$(pwd -P)")"
   if [ $? -ne 0 ]; then
     echo "llmux: no workspace configured for $(pwd -P)" >&2
@@ -35,10 +35,27 @@ func snippet(bin string) string {
   fi
   config_dir="$(echo "$resolve_output" | head -n1)"
   api_key="$(echo "$resolve_output" | sed -n '2p')"
+  worktree_flag="$(echo "$resolve_output" | sed -n '3p')"
+  local args=("$@")
+  if [ "$worktree_flag" = "--worktree" ]; then
+    local no_worktree=false filtered=()
+    for arg in "${args[@]}"; do
+      if [ "$arg" = "--no-worktree" ]; then
+        no_worktree=true
+      else
+        filtered+=("$arg")
+      fi
+    done
+    if [ "$no_worktree" = false ]; then
+      args=("--worktree" "${filtered[@]}")
+    else
+      args=("${filtered[@]}")
+    fi
+  fi
   if [ -n "$api_key" ]; then
-    ANTHROPIC_API_KEY="$api_key" CLAUDE_CONFIG_DIR="$config_dir" command claude "$@"
+    ANTHROPIC_API_KEY="$api_key" CLAUDE_CONFIG_DIR="$config_dir" command claude "${args[@]}"
   else
-    CLAUDE_CONFIG_DIR="$config_dir" command claude "$@"
+    CLAUDE_CONFIG_DIR="$config_dir" command claude "${args[@]}"
   fi
 }`, bin)
 }
@@ -52,10 +69,35 @@ func fishSnippet(bin string) string {
     return 1
   end
   set -l config_dir $resolve_output[1]
-  if test (count $resolve_output) -ge 2; and test -n "$resolve_output[2]"
-    ANTHROPIC_API_KEY=$resolve_output[2] CLAUDE_CONFIG_DIR=$config_dir command claude $argv
+  set -l api_key ""
+  set -l worktree_flag ""
+  if test (count $resolve_output) -ge 2
+    set api_key $resolve_output[2]
+  end
+  if test (count $resolve_output) -ge 3
+    set worktree_flag $resolve_output[3]
+  end
+  set -l args $argv
+  if test "$worktree_flag" = "--worktree"
+    set -l filtered
+    set -l no_worktree false
+    for arg in $args
+      if test "$arg" = "--no-worktree"
+        set no_worktree true
+      else
+        set -a filtered $arg
+      end
+    end
+    if test "$no_worktree" = false
+      set args --worktree $filtered
+    else
+      set args $filtered
+    end
+  end
+  if test -n "$api_key"
+    ANTHROPIC_API_KEY=$api_key CLAUDE_CONFIG_DIR=$config_dir command claude $args
   else
-    CLAUDE_CONFIG_DIR=$config_dir command claude $argv
+    CLAUDE_CONFIG_DIR=$config_dir command claude $args
   end
 end`, bin)
 }

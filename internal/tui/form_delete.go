@@ -20,5 +20,5 @@ func newDeleteForm(name string, data *deleteFormData) *huh.Form {
 				Negative("Cancel").
 				Value(&data.Confirm),
 		),
-	)
+	).WithKeyMap(formKeyMap())
 }

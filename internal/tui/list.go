@@ -51,6 +51,7 @@ func buildList(cfg *config.Config, width, height int) list.Model {
 	l.AdditionalShortHelpKeys = func() []key.Binding {
 		return []key.Binding{
 			key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add")),
+			key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "options")),
 			key.NewBinding(key.WithKeys("d", "x"), key.WithHelp("d", "delete")),
 			key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "set default")),
 		}
@@ -72,6 +73,33 @@ func updateList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.addData = addFormData{}
 			m.addForm = newAddForm(&m.addData)
 			return m, m.addForm.Init()
+		case "o":
+			if item, ok := m.list.SelectedItem().(workspaceItem); ok {
+				// Pre-populate from current settings
+				settings := config.ReadSessionSettings(item.name)
+				disableAttribution := false
+				if settings != nil {
+					if _, ok := settings["attribution"]; ok {
+						disableAttribution = true
+					}
+				}
+				// Find worktree setting from config
+				alwaysWorktree := false
+				for _, ws := range m.cfg.Workspaces {
+					if ws.Name == item.name {
+						alwaysWorktree = ws.Worktree
+						break
+					}
+				}
+				m.optionsTarget = item.name
+				m.optionsData = optionsFormData{
+					DisableAttribution: disableAttribution,
+					AlwaysWorktree:     alwaysWorktree,
+				}
+				m.optionsForm = newOptionsForm(&m.optionsData)
+				m.state = stateOptions
+				return m, m.optionsForm.Init()
+			}
 		case "s":
 			if item, ok := m.list.SelectedItem().(workspaceItem); ok {
 				if m.cfg.DefaultWorkspace == item.name {

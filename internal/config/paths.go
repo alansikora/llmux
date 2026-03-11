@@ -64,6 +64,19 @@ func WriteSessionSettings(name string, settings map[string]any) error {
 	return os.WriteFile(filepath.Join(dir, "settings.json"), data, 0644)
 }
 
+// ReadSessionSettings reads the settings.json from the session directory.
+func ReadSessionSettings(name string) map[string]any {
+	data, err := os.ReadFile(filepath.Join(SessionDir(name), "settings.json"))
+	if err != nil {
+		return nil
+	}
+	var settings map[string]any
+	if err := json.Unmarshal(data, &settings); err != nil {
+		return nil
+	}
+	return settings
+}
+
 func IsAuthenticated(name string) bool {
 	cred := filepath.Join(SessionDir(name), ".credentials.json")
 	_, err := os.Stat(cred)

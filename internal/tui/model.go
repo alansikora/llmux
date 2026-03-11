@@ -15,6 +15,8 @@ type state int
 const (
 	stateList state = iota
 	stateAdding
+	stateAddOptions
+	stateOptions
 	stateDeleting
 )
 
@@ -27,8 +29,13 @@ type Model struct {
 	height int
 
 	// Add form
-	addForm     *huh.Form
-	addData     addFormData
+	addForm *huh.Form
+	addData addFormData
+
+	// Options form (shared by add flow and standalone options)
+	optionsForm   *huh.Form
+	optionsData   optionsFormData
+	optionsTarget string
 
 	// Delete form
 	deleteForm   *huh.Form
@@ -61,6 +68,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
+		if msg.String() == "esc" && m.state != stateList {
+			m.state = stateList
+			m.refreshList()
+			return m, nil
+		}
 	}
 
 	switch m.state {
@@ -74,14 +86,52 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if m.addForm.State == huh.StateCompleted {
-			if m.addData.Confirm {
-				m.applyAdd()
-			}
+			// Transition to options form
+			name := m.resolveAddName()
+			m.optionsTarget = name
+			m.optionsData = optionsFormData{}
+			m.optionsForm = newOptionsForm(&m.optionsData)
+			m.state = stateAddOptions
+			return m, m.optionsForm.Init()
+		}
+		if m.addForm.State == huh.StateAborted {
+			m.state = stateList
+			return m, nil
+		}
+		return m, cmd
+
+	case stateAddOptions:
+		form, cmd := m.optionsForm.Update(msg)
+		if f, ok := form.(*huh.Form); ok {
+			m.optionsForm = f
+		}
+
+		if m.optionsForm.State == huh.StateCompleted {
+			m.applyAdd()
+			m.applyOptions(m.optionsTarget)
 			m.state = stateList
 			m.refreshList()
 			return m, nil
 		}
-		if m.addForm.State == huh.StateAborted {
+		if m.optionsForm.State == huh.StateAborted {
+			m.state = stateList
+			return m, nil
+		}
+		return m, cmd
+
+	case stateOptions:
+		form, cmd := m.optionsForm.Update(msg)
+		if f, ok := form.(*huh.Form); ok {
+			m.optionsForm = f
+		}
+
+		if m.optionsForm.State == huh.StateCompleted {
+			m.applyOptions(m.optionsTarget)
+			m.state = stateList
+			m.refreshList()
+			return m, nil
+		}
+		if m.optionsForm.State == huh.StateAborted {
 			m.state = stateList
 			return m, nil
 		}
@@ -120,6 +170,10 @@ func (m *Model) View() string {
 		content = m.list.View()
 	case stateAdding:
 		content = titleStyle.Render("Add Workspace") + "\n\n" + m.addForm.View()
+	case stateAddOptions:
+		content = titleStyle.Render("Workspace Options") + "\n\n" + m.optionsForm.View()
+	case stateOptions:
+		content = titleStyle.Render("Options: "+m.optionsTarget) + "\n\n" + m.optionsForm.View()
 	case stateDeleting:
 		content = m.deleteForm.View()
 	}
@@ -129,6 +183,19 @@ func (m *Model) View() string {
 		lipgloss.Left, lipgloss.Top,
 		content,
 	))
+}
+
+func (m *Model) resolveAddName() string {
+	name := m.addData.Name
+	if name == "" {
+		path := expandPath(m.addData.FolderPath)
+		abs, err := filepath.Abs(path)
+		if err != nil {
+			return ""
+		}
+		name = filepath.Base(abs)
+	}
+	return name
 }
 
 func (m *Model) applyAdd() {
@@ -157,17 +224,32 @@ func (m *Model) applyAdd() {
 	}
 
 	config.Save(m.cfg)
+}
 
-	settings := map[string]any{}
-	if m.addData.DisableAttribution {
+func (m *Model) applyOptions(name string) {
+	// Update worktree setting in config
+	for i := range m.cfg.Workspaces {
+		if m.cfg.Workspaces[i].Name == name {
+			m.cfg.Workspaces[i].Worktree = m.optionsData.AlwaysWorktree
+			break
+		}
+	}
+	config.Save(m.cfg)
+
+	// Update session settings (attribution)
+	settings := config.ReadSessionSettings(name)
+	if settings == nil {
+		settings = map[string]any{}
+	}
+	if m.optionsData.DisableAttribution {
 		settings["attribution"] = map[string]string{
 			"commit": "",
 			"pr":     "",
 		}
+	} else {
+		delete(settings, "attribution")
 	}
-	if len(settings) > 0 {
-		config.WriteSessionSettings(name, settings)
-	}
+	config.WriteSessionSettings(name, settings)
 }
 
 func (m *Model) refreshList() {
