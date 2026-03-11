@@ -11,9 +11,10 @@ import (
 )
 
 type workspaceItem struct {
-	name string
-	path string
-	auth bool
+	name      string
+	path      string
+	auth      bool
+	isDefault bool
 }
 
 func (w workspaceItem) Title() string {
@@ -21,7 +22,11 @@ func (w workspaceItem) Title() string {
 	if w.auth {
 		indicator = authStyle.Render("●")
 	}
-	return fmt.Sprintf("%s %s", indicator, w.name)
+	name := w.name
+	if w.isDefault {
+		name += " ★"
+	}
+	return fmt.Sprintf("%s %s", indicator, name)
 }
 
 func (w workspaceItem) Description() string { return w.path }
@@ -31,9 +36,10 @@ func buildList(cfg *config.Config, width, height int) list.Model {
 	items := make([]list.Item, len(cfg.Workspaces))
 	for i, ws := range cfg.Workspaces {
 		items[i] = workspaceItem{
-			name: ws.Name,
-			path: ws.Path,
-			auth: config.IsAuthenticated(ws.Name),
+			name:      ws.Name,
+			path:      ws.Path,
+			auth:      config.IsAuthenticated(ws.Name),
+			isDefault: ws.Name == cfg.DefaultWorkspace,
 		}
 	}
 
@@ -46,6 +52,7 @@ func buildList(cfg *config.Config, width, height int) list.Model {
 		return []key.Binding{
 			key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add")),
 			key.NewBinding(key.WithKeys("d", "x"), key.WithHelp("d", "delete")),
+			key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "set default")),
 		}
 	}
 	l.AdditionalFullHelpKeys = l.AdditionalShortHelpKeys
@@ -65,6 +72,17 @@ func updateList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.addData = addFormData{}
 			m.addForm = newAddForm(&m.addData)
 			return m, m.addForm.Init()
+		case "s":
+			if item, ok := m.list.SelectedItem().(workspaceItem); ok {
+				if m.cfg.DefaultWorkspace == item.name {
+					m.cfg.SetDefault("")
+				} else {
+					m.cfg.SetDefault(item.name)
+				}
+				config.Save(m.cfg)
+				m.refreshList()
+				return m, nil
+			}
 		case "d", "x":
 			if item, ok := m.list.SelectedItem().(workspaceItem); ok {
 				m.state = stateDeleting

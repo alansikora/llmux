@@ -13,7 +13,8 @@ type Workspace struct {
 }
 
 type Config struct {
-	Workspaces []Workspace `json:"workspaces"`
+	Workspaces       []Workspace `json:"workspaces"`
+	DefaultWorkspace string      `json:"default_workspace,omitempty"`
 }
 
 type ResolveResult struct {
@@ -71,6 +72,16 @@ func (c *Config) Resolve(dir string) (ResolveResult, error) {
 	}
 
 	if best == nil {
+		if c.DefaultWorkspace != "" {
+			for i := range c.Workspaces {
+				if c.Workspaces[i].Name == c.DefaultWorkspace {
+					return ResolveResult{
+						SessionDir: SessionDir(c.Workspaces[i].Name),
+						APIKey:     c.Workspaces[i].APIKey,
+					}, nil
+				}
+			}
+		}
 		return ResolveResult{}, fmt.Errorf("no workspace configured for %s", dir)
 	}
 
@@ -78,4 +89,18 @@ func (c *Config) Resolve(dir string) (ResolveResult, error) {
 		SessionDir: SessionDir(best.Name),
 		APIKey:     best.APIKey,
 	}, nil
+}
+
+func (c *Config) SetDefault(name string) error {
+	if name == "" {
+		c.DefaultWorkspace = ""
+		return nil
+	}
+	for _, ws := range c.Workspaces {
+		if ws.Name == name {
+			c.DefaultWorkspace = name
+			return nil
+		}
+	}
+	return fmt.Errorf("workspace %q not found", name)
 }

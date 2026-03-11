@@ -174,9 +174,10 @@ func (m *Model) refreshList() {
 	items := make([]list.Item, len(m.cfg.Workspaces))
 	for i, ws := range m.cfg.Workspaces {
 		items[i] = workspaceItem{
-			name: ws.Name,
-			path: ws.Path,
-			auth: config.IsAuthenticated(ws.Name),
+			name:      ws.Name,
+			path:      ws.Path,
+			auth:      config.IsAuthenticated(ws.Name),
+			isDefault: ws.Name == m.cfg.DefaultWorkspace,
 		}
 	}
 	m.list.SetItems(items)
