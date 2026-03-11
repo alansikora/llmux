@@ -11,6 +11,17 @@ Claude Code stores everything in `~/.claude`. If you work across multiple projec
 - **Automatic routing** — `claude` just works based on your current directory
 - **Zero friction** — no manual env vars, no wrapper scripts
 
+## Features
+
+- **Isolated sessions** — each workspace gets its own auth, history, and settings
+- **Automatic routing** — `claude` resolves the right workspace based on your current directory
+- **Default workspace** — set a fallback workspace for directories without a match
+- **Per-workspace API keys** — use different Anthropic API keys per project
+- **Worktree mode** — auto-pass `--worktree` to Claude per workspace, bypass with `--no-worktree`
+- **Disable attributions** — remove "Made with Claude Code" from commits and PRs per workspace
+- **TUI manager** — add, configure, and delete workspaces interactively
+- **Shell integration** — supports zsh, bash, and fish
+
 ## Install
 
 ```bash
@@ -60,9 +71,27 @@ INSTALL_DIR=/usr/local/bin curl -fsSL https://raw.githubusercontent.com/alansiko
 llmux
 ```
 
-Opens an interactive manager. Press `a` to add a workspace, `d` to delete one.
+Opens an interactive manager:
 
-When adding a workspace you provide a folder path and a name. llmux also lets you configure defaults like disabling commit/PR attributions.
+| Key | Action |
+|-----|--------|
+| `a` | Add workspace |
+| `o` | Edit workspace options |
+| `s` | Toggle default workspace (shown with ★) |
+| `d` / `x` | Delete workspace |
+| `↑` / `↓` | Navigate |
+| `esc` | Return to list |
+
+### Default workspace
+
+Press `s` to set a workspace as the default. When you run `claude` from a directory that doesn't match any workspace, the default is used instead of erroring.
+
+### Workspace options
+
+Press `o` to configure a workspace:
+
+- **Disable attributions** — removes "Made with Claude Code" from commits and PRs
+- **Always use worktree** — automatically passes `--worktree` to Claude. Bypass for a single session with `claude --no-worktree`
 
 ### Commands
 
