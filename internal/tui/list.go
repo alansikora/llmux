@@ -32,7 +32,13 @@ func (w workspaceItem) Title() string {
 func (w workspaceItem) Description() string { return w.path }
 func (w workspaceItem) FilterValue() string { return w.name }
 
-func buildList(cfg *config.Config, width, height int) list.Model {
+const logo = ` _ _
+| | |_ __ ___  _   ___  __
+| | | '_ ` + "`" + ` _ \| | | \ \/ /
+| | | | | | | | |_| |>  <
+|_|_|_| |_| |_|\__,_/_/\_\`
+
+func buildList(cfg *config.Config, version string, width, height int) list.Model {
 	items := make([]list.Item, len(cfg.Workspaces))
 	for i, ws := range cfg.Workspaces {
 		items[i] = workspaceItem{

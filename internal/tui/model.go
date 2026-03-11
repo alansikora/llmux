@@ -21,8 +21,9 @@ const (
 )
 
 type Model struct {
-	cfg   *config.Config
-	state state
+	cfg     *config.Config
+	version string
+	state   state
 
 	list   list.Model
 	width  int
@@ -43,15 +44,16 @@ type Model struct {
 	deleteTarget string
 }
 
-func NewModel(cfg *config.Config) *Model {
+func NewModel(cfg *config.Config, version string) *Model {
 	return &Model{
-		cfg:   cfg,
-		state: stateList,
+		cfg:     cfg,
+		version: version,
+		state:   stateList,
 	}
 }
 
 func (m *Model) Init() tea.Cmd {
-	m.list = buildList(m.cfg, 80, 20)
+	m.list = buildList(m.cfg, m.version, 80, 20)
 	return nil
 }
 
@@ -61,7 +63,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		h, v := appStyle.GetFrameSize()
-		m.list.SetSize(msg.Width-h, msg.Height-v)
+		m.list.SetSize(msg.Width-h, msg.Height-v-7)
 		return m, nil
 
 	case tea.KeyMsg:
@@ -167,7 +169,8 @@ func (m *Model) View() string {
 
 	switch m.state {
 	case stateList:
-		content = m.list.View()
+		header := logoStyle.Render(logo) + "  " + versionStyle.Render(m.version) + "\n\n"
+		content = header + m.list.View()
 	case stateAdding:
 		content = titleStyle.Render("Add Workspace") + "\n\n" + m.addForm.View()
 	case stateAddOptions:

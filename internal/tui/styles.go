@@ -17,4 +17,11 @@ var (
 
 	unauthStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241"))
+
+	logoStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("99")).
+			Bold(true)
+
+	versionStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("241"))
 )
