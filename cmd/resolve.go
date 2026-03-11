@@ -28,6 +28,11 @@ var resolveCmd = &cobra.Command{
 		fmt.Print(result.SessionDir)
 		if result.APIKey != "" {
 			fmt.Print("\n" + result.APIKey)
+		} else {
+			fmt.Print("\n")
+		}
+		if result.Worktree {
+			fmt.Print("\n--worktree")
 		}
 		return nil
 	},
