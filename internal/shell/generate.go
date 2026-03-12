@@ -47,6 +47,11 @@ func snippet(bin string) string {
       fi
     done
     if [ "$no_worktree" = false ]; then
+      local default_branch
+      default_branch="$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')"
+      if [ -n "$default_branch" ]; then
+        git fetch origin "$default_branch" 2>/dev/null
+      fi
       args=("--worktree" "${filtered[@]}")
     else
       args=("${filtered[@]}")
@@ -89,6 +94,10 @@ func fishSnippet(bin string) string {
       end
     end
     if test "$no_worktree" = false
+      set -l default_branch (git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+      if test -n "$default_branch"
+        git fetch origin $default_branch 2>/dev/null
+      end
       set args --worktree $filtered
     else
       set args $filtered
