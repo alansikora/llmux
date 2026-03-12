@@ -113,15 +113,24 @@ func fishEvalLine(bin, sh string) string {
 }
 
 // Generate returns the shell function using the absolute path to the binary.
-func Generate(bin, sh string) (string, error) {
+// If shortAlias is true, an additional "c" alias/function is appended.
+func Generate(bin, sh string, shortAlias bool) (string, error) {
+	var out string
 	switch sh {
 	case "zsh", "bash":
-		return snippet(bin), nil
+		out = snippet(bin)
+		if shortAlias {
+			out += "\nc() { claude \"$@\"; }"
+		}
 	case "fish":
-		return fishSnippet(bin), nil
+		out = fishSnippet(bin)
+		if shortAlias {
+			out += "\nfunction c; claude $argv; end"
+		}
 	default:
 		return "", fmt.Errorf("unsupported shell: %s (supported: zsh, bash, fish)", sh)
 	}
+	return out, nil
 }
 
 // Install appends the eval line to the shell's rc file.
