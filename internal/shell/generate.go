@@ -40,7 +40,7 @@ func snippet(bin string) string {
   if [ "$worktree_flag" = "--worktree" ]; then
     local no_worktree=false filtered=()
     for arg in "${args[@]}"; do
-      if [ "$arg" = "--no-worktree" ]; then
+      if [ "$arg" = "--no-worktree" ] || [ "$arg" = "-nw" ]; then
         no_worktree=true
       else
         filtered+=("$arg")
@@ -87,7 +87,7 @@ func fishSnippet(bin string) string {
     set -l filtered
     set -l no_worktree false
     for arg in $args
-      if test "$arg" = "--no-worktree"
+      if test "$arg" = "--no-worktree" -o "$arg" = "-nw"
         set no_worktree true
       else
         set -a filtered $arg
