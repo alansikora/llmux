@@ -11,10 +11,11 @@ import (
 )
 
 type Session struct {
-	Name         string
-	Branch       string
-	ChangedFiles int
-	Path         string
+	Name          string
+	Branch        string
+	ChangedFiles  int
+	Path          string
+	WorkspacePath string
 }
 
 func WorktreesDir(workspacePath string) string {
@@ -26,7 +27,7 @@ func ListSessions(workspacePath string) ([]Session, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			return listSessionsInSubdirs(workspacePath)
 		}
 		return nil, err
 	}
@@ -66,10 +67,11 @@ func ListSessions(workspacePath string) ([]Session, error) {
 		}
 
 		sessions = append(sessions, Session{
-			Name:         entry.Name(),
-			Branch:       strings.TrimSpace(branch),
-			ChangedFiles: changedFiles,
-			Path:         wtPath,
+			Name:          entry.Name(),
+			Branch:        strings.TrimSpace(branch),
+			ChangedFiles:  changedFiles,
+			Path:          wtPath,
+			WorkspacePath: workspacePath,
 		})
 	}
 
@@ -210,6 +212,69 @@ func ResolveSessionsPath(dir string) string {
 	}
 	// Absolute path: strip the trailing /.git component.
 	return filepath.Dir(gitDir)
+}
+
+func listSessionsInSubdirs(parentPath string) ([]Session, error) {
+	entries, err := os.ReadDir(parentPath)
+	if err != nil {
+		return nil, nil
+	}
+	var all []Session
+	for _, entry := range entries {
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+		subPath := filepath.Join(parentPath, entry.Name())
+		if _, err := os.Stat(filepath.Join(subPath, ".git")); err != nil {
+			continue
+		}
+		repoRoot := ResolveSessionsPath(subPath)
+		sessions, err := ListSessions(repoRoot)
+		if err != nil {
+			continue
+		}
+		all = append(all, sessions...)
+	}
+	return all, nil
+}
+
+func FindAppliedWorkspace(sessions []Session) (workspacePath, sessionName string, ok bool) {
+	seen := map[string]bool{}
+	for _, s := range sessions {
+		if s.WorkspacePath == "" || seen[s.WorkspacePath] {
+			continue
+		}
+		seen[s.WorkspacePath] = true
+		if name, applied := HasAppliedSession(s.WorkspacePath); applied {
+			return s.WorkspacePath, name, true
+		}
+	}
+	return "", "", false
+}
+
+func Delete(workspacePath, sessionName string, force bool) error {
+	sessions, err := ListSessions(workspacePath)
+	if err != nil {
+		return fmt.Errorf("listing sessions: %w", err)
+	}
+	var session *Session
+	for i := range sessions {
+		if sessions[i].Name == sessionName {
+			session = &sessions[i]
+			break
+		}
+	}
+	if session == nil {
+		return fmt.Errorf("session %q not found", sessionName)
+	}
+	args := []string{"worktree", "remove", session.Path}
+	if force {
+		args = append(args, "--force")
+	}
+	if _, err := runGit(session.WorkspacePath, args...); err != nil {
+		return err
+	}
+	return nil
 }
 
 func runGit(dir string, args ...string) (string, error) {

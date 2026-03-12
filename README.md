@@ -83,10 +83,10 @@ Opens an interactive manager:
 
 | Key | Action |
 |-----|--------|
+| `enter` | Edit workspace options |
 | `a` | Add workspace |
-| `o` | Edit workspace options |
 | `w` | View worktree sessions |
-| `g` | General options |
+| `o` | General options |
 | `s` | Toggle default workspace (shown with ★) |
 | `d` / `x` | Delete workspace |
 | `↑` / `↓` | Navigate |
@@ -98,7 +98,7 @@ Press `s` to set a workspace as the default. When you run `claude` from a direct
 
 ### Workspace options
 
-Press `o` to configure a workspace:
+Press `enter` on a workspace to configure it:
 
 - **Disable attributions** — removes "Made with Claude Code" from commits and PRs
 - **Always use worktree** — automatically passes `--worktree` to Claude. Bypass for a single session with `claude --no-worktree` (or `-nw`)
@@ -119,7 +119,7 @@ You can also browse and manage sessions from the TUI by pressing `w` on a worksp
 
 ### General options
 
-Press `g` to configure global settings:
+Press `o` to configure global settings:
 
 - **Short alias** — defines `c` as a shorthand for `claude` (requires shell restart to take effect)
 

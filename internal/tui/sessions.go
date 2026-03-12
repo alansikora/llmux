@@ -10,10 +10,11 @@ import (
 )
 
 type sessionItem struct {
-	name         string
-	branch       string
-	changedFiles int
-	applied      bool
+	name          string
+	branch        string
+	changedFiles  int
+	applied       bool
+	workspacePath string
 }
 
 func (s sessionItem) Title() string {
@@ -34,6 +35,8 @@ func (s sessionItem) FilterValue() string { return s.name }
 type sessionsLoadedMsg struct {
 	sessions []worktree.Session
 	applied  string
+	wsPath   string
+	target   string
 }
 
 type applyResultMsg struct {
@@ -45,11 +48,24 @@ type unapplyResultMsg struct {
 	err error
 }
 
-func loadSessionsCmd(wsPath string) tea.Cmd {
+type deleteResultMsg struct {
+	err     error
+	session string
+}
+
+func loadSessionsCmd(rawPath, target string) tea.Cmd {
 	return func() tea.Msg {
+		wsPath := worktree.ResolveSessionsPath(rawPath)
 		sessions, _ := worktree.ListSessions(wsPath)
-		applied, _ := worktree.HasAppliedSession(wsPath)
-		return sessionsLoadedMsg{sessions: sessions, applied: applied}
+		_, applied, _ := worktree.FindAppliedWorkspace(sessions)
+		return sessionsLoadedMsg{sessions: sessions, applied: applied, wsPath: wsPath, target: target}
+	}
+}
+
+func deleteSessionCmd(wsPath, sessionName string, force bool) tea.Cmd {
+	return func() tea.Msg {
+		err := worktree.Delete(wsPath, sessionName, force)
+		return deleteResultMsg{err: err, session: sessionName}
 	}
 }
 
@@ -71,10 +87,11 @@ func buildSessionsList(sessions []worktree.Session, applied string, width, heigh
 	items := make([]list.Item, len(sessions))
 	for i, s := range sessions {
 		items[i] = sessionItem{
-			name:         s.Name,
-			branch:       s.Branch,
-			changedFiles: s.ChangedFiles,
-			applied:      s.Name == applied,
+			name:          s.Name,
+			branch:        s.Branch,
+			changedFiles:  s.ChangedFiles,
+			applied:       s.Name == applied,
+			workspacePath: s.WorkspacePath,
 		}
 	}
 
@@ -87,11 +104,26 @@ func buildSessionsList(sessions []worktree.Session, applied string, width, heigh
 		return []key.Binding{
 			key.NewBinding(key.WithKeys("a", "enter"), key.WithHelp("a/enter", "apply")),
 			key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "unapply")),
+			key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete")),
 			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
 		}
 	}
 	l.AdditionalFullHelpKeys = l.AdditionalShortHelpKeys
 	return l
+}
+
+func sessionsFromList(l list.Model) []worktree.Session {
+	items := l.Items()
+	sessions := make([]worktree.Session, 0, len(items))
+	for _, item := range items {
+		if s, ok := item.(sessionItem); ok {
+			sessions = append(sessions, worktree.Session{
+				Name:          s.name,
+				WorkspacePath: s.workspacePath,
+			})
+		}
+	}
+	return sessions
 }
 
 func updateSessions(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -108,16 +140,21 @@ func updateSessions(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 				m.sessionsStatus = fmt.Sprintf("applying %s...", item.name)
-				return m, applySessionCmd(m.sessionsPath, item.name)
+				return m, applySessionCmd(item.workspacePath, item.name)
 			}
 		case "u":
-			applied, ok := worktree.HasAppliedSession(m.sessionsPath)
+			wsPath, applied, ok := worktree.FindAppliedWorkspace(sessionsFromList(m.sessionsList))
 			if !ok {
 				m.sessionsStatus = "nothing to unapply"
 				return m, nil
 			}
 			m.sessionsStatus = fmt.Sprintf("unapplying %s...", applied)
-			return m, unapplySessionCmd(m.sessionsPath)
+			return m, unapplySessionCmd(wsPath)
+		case "d":
+			if item, ok := m.sessionsList.SelectedItem().(sessionItem); ok {
+				m.sessionsStatus = fmt.Sprintf("deleting %s...", item.name)
+				return m, deleteSessionCmd(item.workspacePath, item.name, false)
+			}
 		}
 	}
 
