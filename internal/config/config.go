@@ -20,9 +20,10 @@ type Config struct {
 }
 
 type ResolveResult struct {
-	SessionDir string
-	APIKey     string
-	Worktree   bool
+	SessionDir    string
+	APIKey        string
+	Worktree      bool
+	WorkspaceName string
 }
 
 func (c *Config) Add(name, path string) error {
@@ -79,9 +80,10 @@ func (c *Config) Resolve(dir string) (ResolveResult, error) {
 			for i := range c.Workspaces {
 				if c.Workspaces[i].Name == c.DefaultWorkspace {
 					return ResolveResult{
-						SessionDir: SessionDir(c.Workspaces[i].Name),
-						APIKey:     c.Workspaces[i].APIKey,
-						Worktree:   c.Workspaces[i].Worktree,
+						SessionDir:    SessionDir(c.Workspaces[i].Name),
+						APIKey:        c.Workspaces[i].APIKey,
+						Worktree:      c.Workspaces[i].Worktree,
+						WorkspaceName: c.Workspaces[i].Name,
 					}, nil
 				}
 			}
@@ -90,9 +92,10 @@ func (c *Config) Resolve(dir string) (ResolveResult, error) {
 	}
 
 	return ResolveResult{
-		SessionDir: SessionDir(best.Name),
-		APIKey:     best.APIKey,
-		Worktree:   best.Worktree,
+		SessionDir:    SessionDir(best.Name),
+		APIKey:        best.APIKey,
+		Worktree:      best.Worktree,
+		WorkspaceName: best.Name,
 	}, nil
 }
 

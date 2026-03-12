@@ -42,6 +42,7 @@ var resolveCmd = &cobra.Command{
 			return err
 		}
 
+		fmt.Fprint(os.Stderr, "\033[90m↳ account: "+result.WorkspaceName+"\033[0m\n")
 		fmt.Print(result.SessionDir)
 		if result.APIKey != "" {
 			fmt.Print("\n" + result.APIKey)
