@@ -6,14 +6,16 @@ type generalOptionsFormData struct {
 	ShortAlias bool
 }
 
-func newGeneralOptionsForm(data *generalOptionsFormData) *huh.Form {
+func newGeneralOptionsForm(data *generalOptionsFormData, orig generalOptionsFormData) *huh.Form {
 	return huh.NewForm(
 		huh.NewGroup(
-			huh.NewConfirm().
-				Title("Enable short alias?").
+			confirmLeft().
+				TitleFunc(func() string {
+					return dirtyTitle("Enable short alias?", data.ShortAlias != orig.ShortAlias)
+				}, &data.ShortAlias).
 				Description("Also define \"c\" as a shorthand for \"claude\" (requires shell restart)").
-				Affirmative("Yes").
-				Negative("No").
+				Affirmative("Enabled").
+				Negative("Disabled").
 				Value(&data.ShortAlias),
 		),
 	).WithKeyMap(formKeyMap())

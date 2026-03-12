@@ -8,30 +8,36 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/allskar/llmux/internal/config"
-	"github.com/allskar/llmux/internal/worktree"
 )
 
 type workspaceItem struct {
 	name      string
 	path      string
-	auth      bool
+	authInfo  config.AuthInfo
 	isDefault bool
+	loading   string
 }
 
 func (w workspaceItem) Title() string {
-	star := "  "
+	if w.loading != "" {
+		prefix := unauthStyle.Render("[no auth]")
+		if w.authInfo.Authenticated {
+			prefix = authStyle.Render("[" + w.authInfo.Email + "]")
+		}
+		return fmt.Sprintf("%s %s %s", prefix, w.name, w.loading)
+	}
+
+	prefix := unauthStyle.Render("[no auth]")
+	if w.authInfo.Authenticated {
+		prefix = authStyle.Render("[" + w.authInfo.Email + "]")
+	}
+
+	star := " "
 	if w.isDefault {
-		star = defaultStarStyle.Render("★") + " "
+		star = "★"
 	}
 
-	dot := unauthStyle.Render("●")
-	pill := unauthPillStyle.Render("[no auth]")
-	if w.auth {
-		dot = authStyle.Render("●")
-		pill = authPillStyle.Render("[authed]")
-	}
-
-	return fmt.Sprintf("%s%s %s  %s", star, dot, w.name, pill)
+	return fmt.Sprintf("%s %s %s", prefix, w.name, star)
 }
 
 func (w workspaceItem) Description() string { return w.path }
@@ -49,7 +55,7 @@ func buildList(cfg *config.Config, version string, width, height int) list.Model
 		items[i] = workspaceItem{
 			name:      ws.Name,
 			path:      ws.Path,
-			auth:      config.IsAuthenticated(ws.Name),
+			authInfo:  config.GetAuthInfo(ws.Name),
 			isDefault: ws.Name == cfg.DefaultWorkspace,
 		}
 	}
@@ -61,12 +67,12 @@ func buildList(cfg *config.Config, version string, width, height int) list.Model
 	l.SetShowHelp(true)
 	l.AdditionalShortHelpKeys = func() []key.Binding {
 		return []key.Binding{
+			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "options")),
 			key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add")),
-			key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "options")),
 			key.NewBinding(key.WithKeys("d", "x"), key.WithHelp("d", "delete")),
 			key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "set default")),
 			key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "worktrees")),
-			key.NewBinding(key.WithKeys("g"), key.WithHelp("g", "general options")),
+			key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "general options")),
 		}
 	}
 	l.AdditionalFullHelpKeys = l.AdditionalShortHelpKeys
@@ -86,7 +92,7 @@ func updateList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.addData = addFormData{}
 			m.addForm = newAddForm(&m.addData)
 			return m, m.addForm.Init()
-		case "o":
+		case "enter":
 			if item, ok := m.list.SelectedItem().(workspaceItem); ok {
 				// Pre-populate from current settings
 				settings := config.ReadSessionSettings(item.name)
@@ -109,7 +115,7 @@ func updateList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 					DisableAttribution: disableAttribution,
 					AlwaysWorktree:     alwaysWorktree,
 				}
-				m.optionsForm = newOptionsForm(&m.optionsData)
+				m.optionsForm = newOptionsForm(&m.optionsData, m.optionsData)
 				m.state = stateOptions
 				return m, m.optionsForm.Init()
 			}
@@ -126,17 +132,16 @@ func updateList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "w":
 			if item, ok := m.list.SelectedItem().(workspaceItem); ok {
-				m.sessionsTarget = item.name
-				m.sessionsPath = worktree.ResolveSessionsPath(item.path)
-				m.sessionsStatus = ""
-				m.state = stateSessions
-				return m, loadSessionsCmd(m.sessionsPath)
+				m.sessionsLoading = true
+				m.loadingWorkspace = item.name
+				m.updateLoadingItem()
+				return m, tea.Batch(loadSessionsCmd(item.path, item.name), m.spinner.Tick)
 			}
-		case "g":
+		case "o":
 			m.generalOptionsData = generalOptionsFormData{
 				ShortAlias: m.cfg.ShortAlias,
 			}
-			m.generalOptionsForm = newGeneralOptionsForm(&m.generalOptionsData)
+			m.generalOptionsForm = newGeneralOptionsForm(&m.generalOptionsData, m.generalOptionsData)
 			m.state = stateGeneralOptions
 			return m, m.generalOptionsForm.Init()
 		case "d", "x":

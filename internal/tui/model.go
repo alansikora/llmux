@@ -6,6 +6,7 @@ import (
 
 	"github.com/allskar/llmux/internal/config"
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -52,6 +53,11 @@ type Model struct {
 	sessionsPath   string
 	sessionsStatus string
 
+	// Sessions loading (inline spinner on workspace list)
+	sessionsLoading  bool
+	loadingWorkspace string
+	spinner          spinner.Model
+
 	// General options form
 	generalOptionsForm *huh.Form
 	generalOptionsData generalOptionsFormData
@@ -67,15 +73,32 @@ func NewModel(cfg *config.Config, version string) *Model {
 
 func (m *Model) Init() tea.Cmd {
 	m.list = buildList(m.cfg, m.version, 80, 20)
+	m.spinner = spinner.New(spinner.WithSpinner(spinner.Dot))
 	return nil
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case spinner.TickMsg:
+		if m.sessionsLoading {
+			var cmd tea.Cmd
+			m.spinner, cmd = m.spinner.Update(msg)
+			m.updateLoadingItem()
+			return m, cmd
+		}
+		return m, nil
 	case sessionsLoadedMsg:
+		m.sessionsLoading = false
+		m.loadingWorkspace = ""
+		m.refreshList()
 		h, v := appStyle.GetFrameSize()
 		m.sessionsList = buildSessionsList(msg.sessions, msg.applied, m.width-h, m.height-v-7)
 		m.sessionsStatus = ""
+		if msg.wsPath != "" {
+			m.sessionsPath = msg.wsPath
+		}
+		m.sessionsTarget = msg.target
+		m.state = stateSessions
 		return m, nil
 	case applyResultMsg:
 		if msg.err != nil {
@@ -83,14 +106,21 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.sessionsStatus = fmt.Sprintf("applied %s", msg.session)
-		return m, loadSessionsCmd(m.sessionsPath)
+		return m, loadSessionsCmd(m.sessionsPath, m.sessionsTarget)
 	case unapplyResultMsg:
 		if msg.err != nil {
 			m.sessionsStatus = fmt.Sprintf("error: %v", msg.err)
 			return m, nil
 		}
 		m.sessionsStatus = "unapplied"
-		return m, loadSessionsCmd(m.sessionsPath)
+		return m, loadSessionsCmd(m.sessionsPath, m.sessionsTarget)
+	case deleteResultMsg:
+		if msg.err != nil {
+			m.sessionsStatus = fmt.Sprintf("error: %v", msg.err)
+			return m, nil
+		}
+		m.sessionsStatus = fmt.Sprintf("deleted %s", msg.session)
+		return m, loadSessionsCmd(m.sessionsPath, m.sessionsTarget)
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -103,6 +133,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		if msg.String() == "esc" && m.state != stateList {
+			m.sessionsLoading = false
 			m.state = stateList
 			m.refreshList()
 			return m, nil
@@ -124,7 +155,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			name := m.resolveAddName()
 			m.optionsTarget = name
 			m.optionsData = optionsFormData{}
-			m.optionsForm = newOptionsForm(&m.optionsData)
+			m.optionsForm = newOptionsForm(&m.optionsData, m.optionsData)
 			m.state = stateAddOptions
 			return m, m.optionsForm.Init()
 		}
@@ -228,9 +259,9 @@ func (m *Model) View() string {
 	case stateAdding:
 		content = titleStyle.Render("Add Workspace") + "\n\n" + m.addForm.View()
 	case stateAddOptions:
-		content = titleStyle.Render("Workspace Options") + "\n\n" + m.optionsForm.View()
+		content = titleStyle.Render("Workspace Options") + "\n\n" + m.optionsForm.View() + "\n" + hintStyle.Render("enter to save · esc to cancel")
 	case stateOptions:
-		content = titleStyle.Render("Options: "+m.optionsTarget) + "\n\n" + m.optionsForm.View()
+		content = titleStyle.Render("Options: "+m.optionsTarget) + "\n\n" + m.optionsForm.View() + "\n" + hintStyle.Render("enter to save · esc to cancel")
 	case stateDeleting:
 		content = m.deleteForm.View()
 	case stateSessions:
@@ -238,9 +269,9 @@ func (m *Model) View() string {
 		if m.sessionsStatus != "" {
 			status = "\n" + statusBarStyle.Render(m.sessionsStatus)
 		}
-		content = titleStyle.Render("Sessions: "+m.sessionsTarget) + "\n\n" + m.sessionsList.View() + status
+		content = m.sessionsList.View() + status
 	case stateGeneralOptions:
-		content = titleStyle.Render("General Options") + "\n\n" + m.generalOptionsForm.View()
+		content = titleStyle.Render("General Options") + "\n\n" + m.generalOptionsForm.View() + "\n" + hintStyle.Render("enter to save · esc to cancel")
 	}
 
 	return appStyle.Render(lipgloss.Place(
@@ -317,13 +348,28 @@ func (m *Model) applyOptions(name string) {
 	config.WriteSessionSettings(name, settings)
 }
 
+func (m *Model) updateLoadingItem() {
+	items := m.list.Items()
+	for i, item := range items {
+		if ws, ok := item.(workspaceItem); ok {
+			if ws.name == m.loadingWorkspace {
+				ws.loading = m.spinner.View()
+			} else {
+				ws.loading = ""
+			}
+			items[i] = ws
+		}
+	}
+	m.list.SetItems(items)
+}
+
 func (m *Model) refreshList() {
 	items := make([]list.Item, len(m.cfg.Workspaces))
 	for i, ws := range m.cfg.Workspaces {
 		items[i] = workspaceItem{
 			name:      ws.Name,
 			path:      ws.Path,
-			auth:      config.IsAuthenticated(ws.Name),
+			authInfo:  config.GetAuthInfo(ws.Name),
 			isDefault: ws.Name == m.cfg.DefaultWorkspace,
 		}
 	}

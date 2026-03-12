@@ -77,8 +77,37 @@ func ReadSessionSettings(name string) map[string]any {
 	return settings
 }
 
+// AuthInfo holds display information about a workspace's authentication.
+type AuthInfo struct {
+	Authenticated bool
+	Email         string
+	Organization  string
+}
+
+// GetAuthInfo reads the .claude.json in the session directory to determine
+// authentication status and account details.
+func GetAuthInfo(name string) AuthInfo {
+	data, err := os.ReadFile(filepath.Join(SessionDir(name), ".claude.json"))
+	if err != nil {
+		return AuthInfo{}
+	}
+	var doc struct {
+		OAuthAccount *struct {
+			EmailAddress     string `json:"emailAddress"`
+			OrganizationName string `json:"organizationName"`
+		} `json:"oauthAccount"`
+	}
+	if err := json.Unmarshal(data, &doc); err != nil || doc.OAuthAccount == nil {
+		return AuthInfo{}
+	}
+	return AuthInfo{
+		Authenticated: true,
+		Email:         doc.OAuthAccount.EmailAddress,
+		Organization:  doc.OAuthAccount.OrganizationName,
+	}
+}
+
+// IsAuthenticated reports whether a workspace has valid auth credentials.
 func IsAuthenticated(name string) bool {
-	cred := filepath.Join(SessionDir(name), ".credentials.json")
-	_, err := os.Stat(cred)
-	return err == nil
+	return GetAuthInfo(name).Authenticated
 }
