@@ -16,7 +16,18 @@ var (
 			Foreground(lipgloss.Color("42"))
 
 	unauthStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241"))
+			Foreground(lipgloss.Color("196"))
+
+	defaultStarStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("220"))
+
+	authPillStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("42")).
+			Bold(true)
+
+	unauthPillStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("196")).
+			Bold(true)
 
 	logoStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("99")).

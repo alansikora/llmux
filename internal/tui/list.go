@@ -18,15 +18,19 @@ type workspaceItem struct {
 }
 
 func (w workspaceItem) Title() string {
-	indicator := unauthStyle.Render("○")
-	if w.auth {
-		indicator = authStyle.Render("●")
-	}
-	name := w.name
+	star := "  "
 	if w.isDefault {
-		name += " ★"
+		star = defaultStarStyle.Render("★") + " "
 	}
-	return fmt.Sprintf("%s %s", indicator, name)
+
+	dot := unauthStyle.Render("●")
+	pill := unauthPillStyle.Render("[no auth]")
+	if w.auth {
+		dot = authStyle.Render("●")
+		pill = authPillStyle.Render("[authed]")
+	}
+
+	return fmt.Sprintf("%s%s %s  %s", star, dot, w.name, pill)
 }
 
 func (w workspaceItem) Description() string { return w.path }
