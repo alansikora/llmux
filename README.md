@@ -61,6 +61,12 @@ go build -o llmux .
 INSTALL_DIR=/usr/local/bin curl -fsSL https://raw.githubusercontent.com/alansikora/llmux/main/install.sh | sudo sh
 ```
 
+**Canary (latest from `main`):**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/alansikora/llmux/main/install.sh | sh -s -- --canary
+```
+
 </details>
 
 ## Usage

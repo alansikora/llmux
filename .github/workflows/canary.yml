@@ -1,0 +1,43 @@
+name: Canary
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "**.go"
+      - "go.mod"
+      - "go.sum"
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --snapshot --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish canary release
+        run: |
+          gh release delete canary --yes --cleanup-tag 2>/dev/null || true
+          gh release create canary dist/*.tar.gz dist/checksums.txt \
+            --title "Canary ($(git rev-parse --short HEAD))" \
+            --notes "Latest build from \`main\` — commit $(git rev-parse --short HEAD). Not a stable release." \
+            --prerelease \
+            --target main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
