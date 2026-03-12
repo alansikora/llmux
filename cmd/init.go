@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/allskar/llmux/internal/config"
 	"github.com/allskar/llmux/internal/shell"
 	"github.com/spf13/cobra"
 )
@@ -23,8 +24,13 @@ var initCmd = &cobra.Command{
 			return fmt.Errorf("could not determine executable path: %w", err)
 		}
 
+		cfg, err := config.Load()
+		if err != nil {
+			cfg = &config.Config{}
+		}
+
 		if printFlag {
-			out, err := shell.Generate(bin, args[0])
+			out, err := shell.Generate(bin, args[0], cfg.ShortAlias)
 			if err != nil {
 				return err
 			}

@@ -61,6 +61,7 @@ func buildList(cfg *config.Config, version string, width, height int) list.Model
 			key.NewBinding(key.WithKeys("d", "x"), key.WithHelp("d", "delete")),
 			key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "set default")),
 			key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "worktrees")),
+			key.NewBinding(key.WithKeys("g"), key.WithHelp("g", "general options")),
 		}
 	}
 	l.AdditionalFullHelpKeys = l.AdditionalShortHelpKeys
@@ -126,6 +127,13 @@ func updateList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.state = stateSessions
 				return m, loadSessionsCmd(item.path)
 			}
+		case "g":
+			m.generalOptionsData = generalOptionsFormData{
+				ShortAlias: m.cfg.ShortAlias,
+			}
+			m.generalOptionsForm = newGeneralOptionsForm(&m.generalOptionsData)
+			m.state = stateGeneralOptions
+			return m, m.generalOptionsForm.Init()
 		case "d", "x":
 			if item, ok := m.list.SelectedItem().(workspaceItem); ok {
 				m.state = stateDeleting

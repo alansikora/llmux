@@ -20,6 +20,7 @@ Claude Code stores everything in `~/.claude`. If you work across multiple projec
 - **Worktree mode** — auto-pass `--worktree` to Claude per workspace, bypass with `--no-worktree`
 - **Worktree session management** — list, apply, and revert Claude worktree session changes for testing
 - **Disable attributions** — remove "Made with Claude Code" from commits and PRs per workspace
+- **Short alias** — optionally define `c` as a shorthand for `claude`
 - **TUI manager** — add, configure, and delete workspaces interactively
 - **Shell integration** — supports zsh, bash, and fish
 
@@ -62,6 +63,12 @@ go build -o llmux .
 INSTALL_DIR=/usr/local/bin curl -fsSL https://raw.githubusercontent.com/alansikora/llmux/main/install.sh | sudo sh
 ```
 
+**Canary (latest from `main`):**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/alansikora/llmux/main/install.sh | sh -s -- --canary
+```
+
 </details>
 
 ## Usage
@@ -79,6 +86,7 @@ Opens an interactive manager:
 | `a` | Add workspace |
 | `o` | Edit workspace options |
 | `w` | View worktree sessions |
+| `g` | General options |
 | `s` | Toggle default workspace (shown with ★) |
 | `d` / `x` | Delete workspace |
 | `↑` / `↓` | Navigate |
@@ -109,6 +117,12 @@ Changes are applied as uncommitted modifications — no merge commits. If your w
 
 You can also browse and manage sessions from the TUI by pressing `w` on a workspace.
 
+### General options
+
+Press `g` to configure global settings:
+
+- **Short alias** — defines `c` as a shorthand for `claude` (requires shell restart to take effect)
+
 ### Commands
 
 ```bash
@@ -122,18 +136,24 @@ After running `llmux init zsh`, your shell has a thin `claude()` wrapper:
 
 ```bash
 claude() {
-  local config_dir
-  config_dir="$(/path/to/llmux resolve "$(pwd -P)")"
+  local resolve_output config_dir api_key worktree_flag
+  resolve_output="$(/path/to/llmux resolve "$(pwd -P)")"
   if [ $? -ne 0 ]; then
     echo "llmux: no workspace configured for $(pwd -P)" >&2
     echo "Run 'llmux' to manage workspaces." >&2
     return 1
   fi
-  CLAUDE_CONFIG_DIR="$config_dir" command claude "$@"
+  config_dir="$(echo "$resolve_output" | head -n1)"
+  api_key="$(echo "$resolve_output" | sed -n '2p')"
+  worktree_flag="$(echo "$resolve_output" | sed -n '3p')"
+  # ... worktree and API key handling
+  CLAUDE_CONFIG_DIR="$config_dir" command claude "${args[@]}"
 }
 ```
 
 When you run `claude` in any directory, the wrapper calls `llmux resolve` to find the matching workspace using longest-prefix path matching. The resolved session directory is passed as `CLAUDE_CONFIG_DIR`.
+
+If the workspace has **Always use worktree** enabled, the wrapper also runs `git fetch origin <default-branch>` before launching Claude — so the worktree is always based on an up-to-date branch. The fetch is a best-effort no-op if there's no remote, no network, or `origin/HEAD` isn't set. Pass `--no-worktree` to skip both the fetch and the worktree for a single session.
 
 Workspaces and sessions are stored in `~/.config/llmux/`:
 

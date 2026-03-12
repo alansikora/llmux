@@ -2,10 +2,27 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/allskar/llmux/internal/config"
 	"github.com/spf13/cobra"
 )
+
+// isGitRepo checks whether dir (or any ancestor) contains a .git entry.
+func isGitRepo(dir string) bool {
+	dir = filepath.Clean(dir)
+	for {
+		if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
+			return true
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return false
+		}
+		dir = parent
+	}
+}
 
 var resolveCmd = &cobra.Command{
 	Use:           "resolve [path]",
@@ -32,7 +49,12 @@ var resolveCmd = &cobra.Command{
 			fmt.Print("\n")
 		}
 		if result.Worktree {
-			fmt.Print("\n--worktree")
+			if isGitRepo(args[0]) {
+				fmt.Fprint(os.Stderr, "\033[90m↳ worktree mode enabled. Use --no-worktree to open claude normally.\033[0m\n")
+				fmt.Print("\n--worktree")
+			} else {
+				fmt.Fprint(os.Stderr, "\033[90m↳ worktree mode skipped: not a git repository.\033[0m\n")
+			}
 		}
 		return nil
 	},

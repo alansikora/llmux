@@ -20,6 +20,7 @@ const (
 	stateOptions
 	stateDeleting
 	stateSessions
+	stateGeneralOptions
 )
 
 type Model struct {
@@ -50,6 +51,10 @@ type Model struct {
 	sessionsTarget string
 	sessionsPath   string
 	sessionsStatus string
+
+	// General options form
+	generalOptionsForm *huh.Form
+	generalOptionsData generalOptionsFormData
 }
 
 func NewModel(cfg *config.Config, version string) *Model {
@@ -189,6 +194,25 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case stateSessions:
 		return updateSessions(m, msg)
+
+	case stateGeneralOptions:
+		form, cmd := m.generalOptionsForm.Update(msg)
+		if f, ok := form.(*huh.Form); ok {
+			m.generalOptionsForm = f
+		}
+
+		if m.generalOptionsForm.State == huh.StateCompleted {
+			m.cfg.ShortAlias = m.generalOptionsData.ShortAlias
+			config.Save(m.cfg)
+			m.state = stateList
+			m.refreshList()
+			return m, nil
+		}
+		if m.generalOptionsForm.State == huh.StateAborted {
+			m.state = stateList
+			return m, nil
+		}
+		return m, cmd
 	}
 
 	return m, nil
@@ -215,6 +239,8 @@ func (m *Model) View() string {
 			status = "\n" + statusBarStyle.Render(m.sessionsStatus)
 		}
 		content = titleStyle.Render("Sessions: "+m.sessionsTarget) + "\n\n" + m.sessionsList.View() + status
+	case stateGeneralOptions:
+		content = titleStyle.Render("General Options") + "\n\n" + m.generalOptionsForm.View()
 	}
 
 	return appStyle.Render(lipgloss.Place(
