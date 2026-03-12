@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/allskar/llmux/internal/config"
 	"github.com/allskar/llmux/internal/worktree"
@@ -23,11 +24,17 @@ var unapplyCmd = &cobra.Command{
 			return err
 		}
 
-		if err := worktree.Unapply(ws.Path); err != nil {
+		sessionsPath := ws.Path
+		cwd, err := os.Getwd()
+		if err == nil {
+			sessionsPath = worktree.ResolveSessionsPath(cwd)
+		}
+
+		if err := worktree.Unapply(sessionsPath); err != nil {
 			return err
 		}
 
-		fmt.Printf("Unapplied session changes from %s\n", ws.Path)
+		fmt.Printf("Unapplied session changes from %s\n", sessionsPath)
 		return nil
 	},
 }

@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/allskar/llmux/internal/config"
+	"github.com/allskar/llmux/internal/worktree"
 )
 
 type workspaceItem struct {
@@ -122,10 +123,10 @@ func updateList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "w":
 			if item, ok := m.list.SelectedItem().(workspaceItem); ok {
 				m.sessionsTarget = item.name
-				m.sessionsPath = item.path
+				m.sessionsPath = worktree.ResolveSessionsPath(item.path)
 				m.sessionsStatus = ""
 				m.state = stateSessions
-				return m, loadSessionsCmd(item.path)
+				return m, loadSessionsCmd(m.sessionsPath)
 			}
 		case "g":
 			m.generalOptionsData = generalOptionsFormData{
