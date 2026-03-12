@@ -96,6 +96,38 @@ func (c *Config) Resolve(dir string) (ResolveResult, error) {
 	}, nil
 }
 
+// FindWorkspace returns the workspace that best matches the given directory
+// using longest-prefix match, or by name if nameOrDir matches a workspace name.
+func (c *Config) FindWorkspace(nameOrDir string) (*Workspace, error) {
+	// Try by name first
+	for i := range c.Workspaces {
+		if c.Workspaces[i].Name == nameOrDir {
+			return &c.Workspaces[i], nil
+		}
+	}
+
+	// Try by path (longest prefix match)
+	dir := filepath.Clean(nameOrDir)
+	var best *Workspace
+	bestLen := 0
+
+	for i := range c.Workspaces {
+		ws := &c.Workspaces[i]
+		if dir == ws.Path || strings.HasPrefix(dir, ws.Path+"/") {
+			if len(ws.Path) > bestLen {
+				best = ws
+				bestLen = len(ws.Path)
+			}
+		}
+	}
+
+	if best != nil {
+		return best, nil
+	}
+
+	return nil, fmt.Errorf("no workspace found for %q", nameOrDir)
+}
+
 func (c *Config) SetDefault(name string) error {
 	if name == "" {
 		c.DefaultWorkspace = ""

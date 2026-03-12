@@ -24,4 +24,7 @@ var (
 
 	versionStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241"))
+
+	appliedStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("42"))
 )

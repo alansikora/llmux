@@ -18,6 +18,7 @@ Claude Code stores everything in `~/.claude`. If you work across multiple projec
 - **Default workspace** — set a fallback workspace for directories without a match
 - **Per-workspace API keys** — use different Anthropic API keys per project
 - **Worktree mode** — auto-pass `--worktree` to Claude per workspace, bypass with `--no-worktree`
+- **Worktree session management** — list, apply, and revert Claude worktree session changes for testing
 - **Disable attributions** — remove "Made with Claude Code" from commits and PRs per workspace
 - **Short alias** — optionally define `c` as a shorthand for `claude`
 - **TUI manager** — add, configure, and delete workspaces interactively
@@ -84,6 +85,7 @@ Opens an interactive manager:
 |-----|--------|
 | `a` | Add workspace |
 | `o` | Edit workspace options |
+| `w` | View worktree sessions |
 | `g` | General options |
 | `s` | Toggle default workspace (shown with ★) |
 | `d` / `x` | Delete workspace |
@@ -100,6 +102,20 @@ Press `o` to configure a workspace:
 
 - **Disable attributions** — removes "Made with Claude Code" from commits and PRs
 - **Always use worktree** — automatically passes `--worktree` to Claude. Bypass for a single session with `claude --no-worktree`
+
+### Worktree sessions
+
+When Claude Code runs with `--worktree`, it creates a git worktree under `.claude/worktrees/` with changes on a separate branch. Use these commands to apply those changes to your main working tree for testing:
+
+```bash
+llmux sessions              # list worktree sessions for the current workspace
+llmux apply <session>       # apply session changes as uncommitted diffs on main
+llmux unapply               # revert applied changes (restores any auto-stashed state)
+```
+
+Changes are applied as uncommitted modifications — no merge commits. If your working tree is dirty when you run `apply`, llmux auto-stashes first and restores on `unapply`.
+
+You can also browse and manage sessions from the TUI by pressing `w` on a workspace.
 
 ### General options
 
