@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"github.com/allskar/llmux/internal/config"
@@ -18,6 +19,7 @@ const (
 	stateAddOptions
 	stateOptions
 	stateDeleting
+	stateSessions
 )
 
 type Model struct {
@@ -42,6 +44,12 @@ type Model struct {
 	deleteForm   *huh.Form
 	deleteData   deleteFormData
 	deleteTarget string
+
+	// Sessions view
+	sessionsList   list.Model
+	sessionsTarget string
+	sessionsPath   string
+	sessionsStatus string
 }
 
 func NewModel(cfg *config.Config, version string) *Model {
@@ -59,6 +67,25 @@ func (m *Model) Init() tea.Cmd {
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case sessionsLoadedMsg:
+		h, v := appStyle.GetFrameSize()
+		m.sessionsList = buildSessionsList(msg.sessions, msg.applied, m.width-h, m.height-v-7)
+		m.sessionsStatus = ""
+		return m, nil
+	case applyResultMsg:
+		if msg.err != nil {
+			m.sessionsStatus = fmt.Sprintf("error: %v", msg.err)
+			return m, nil
+		}
+		m.sessionsStatus = fmt.Sprintf("applied %s", msg.session)
+		return m, loadSessionsCmd(m.sessionsPath)
+	case unapplyResultMsg:
+		if msg.err != nil {
+			m.sessionsStatus = fmt.Sprintf("error: %v", msg.err)
+			return m, nil
+		}
+		m.sessionsStatus = "unapplied"
+		return m, loadSessionsCmd(m.sessionsPath)
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -159,6 +186,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, cmd
+
+	case stateSessions:
+		return updateSessions(m, msg)
 	}
 
 	return m, nil
@@ -179,6 +209,12 @@ func (m *Model) View() string {
 		content = titleStyle.Render("Options: "+m.optionsTarget) + "\n\n" + m.optionsForm.View()
 	case stateDeleting:
 		content = m.deleteForm.View()
+	case stateSessions:
+		status := ""
+		if m.sessionsStatus != "" {
+			status = "\n" + statusBarStyle.Render(m.sessionsStatus)
+		}
+		content = titleStyle.Render("Sessions: "+m.sessionsTarget) + "\n\n" + m.sessionsList.View() + status
 	}
 
 	return appStyle.Render(lipgloss.Place(

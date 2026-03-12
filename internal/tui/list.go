@@ -60,6 +60,7 @@ func buildList(cfg *config.Config, version string, width, height int) list.Model
 			key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "options")),
 			key.NewBinding(key.WithKeys("d", "x"), key.WithHelp("d", "delete")),
 			key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "set default")),
+			key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "worktrees")),
 		}
 	}
 	l.AdditionalFullHelpKeys = l.AdditionalShortHelpKeys
@@ -116,6 +117,14 @@ func updateList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 				config.Save(m.cfg)
 				m.refreshList()
 				return m, nil
+			}
+		case "w":
+			if item, ok := m.list.SelectedItem().(workspaceItem); ok {
+				m.sessionsTarget = item.name
+				m.sessionsPath = item.path
+				m.sessionsStatus = ""
+				m.state = stateSessions
+				return m, loadSessionsCmd(item.path)
 			}
 		case "d", "x":
 			if item, ok := m.list.SelectedItem().(workspaceItem); ok {
