@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/allskar/llmux/internal/config"
 	"github.com/allskar/llmux/internal/worktree"
@@ -27,11 +28,21 @@ var applyCmd = &cobra.Command{
 			return err
 		}
 
-		if err := worktree.Apply(ws.Path, args[0]); err != nil {
+		// When no explicit workspace was given, prefer the git repo root so
+		// that sessions stored in {repo}/.claude/worktrees/ are found correctly.
+		sessionsPath := ws.Path
+		if applyWorkspace == "" {
+			cwd, err := os.Getwd()
+			if err == nil {
+				sessionsPath = worktree.ResolveSessionsPath(cwd)
+			}
+		}
+
+		if err := worktree.Apply(sessionsPath, args[0]); err != nil {
 			return err
 		}
 
-		fmt.Printf("Applied session %q to %s\n", args[0], ws.Path)
+		fmt.Printf("Applied session %q to %s\n", args[0], sessionsPath)
 		return nil
 	},
 }

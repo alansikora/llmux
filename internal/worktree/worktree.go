@@ -188,6 +188,30 @@ func Unapply(workspacePath string) error {
 	return RemoveState(workspacePath)
 }
 
+// ResolveSessionsPath returns the git main worktree root for the given
+// directory, falling back to dir itself if git is unavailable.
+func ResolveSessionsPath(dir string) string {
+	cmd := exec.Command("git", "rev-parse", "--git-common-dir")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		return dir
+	}
+	gitDir := strings.TrimSpace(string(out))
+	if !filepath.IsAbs(gitDir) {
+		// Relative .git means we're already in the main worktree.
+		cmd2 := exec.Command("git", "rev-parse", "--show-toplevel")
+		cmd2.Dir = dir
+		out2, err := cmd2.Output()
+		if err != nil {
+			return dir
+		}
+		return strings.TrimSpace(string(out2))
+	}
+	// Absolute path: strip the trailing /.git component.
+	return filepath.Dir(gitDir)
+}
+
 func runGit(dir string, args ...string) (string, error) {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
