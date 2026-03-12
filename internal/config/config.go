@@ -16,6 +16,7 @@ type Workspace struct {
 type Config struct {
 	Workspaces       []Workspace `json:"workspaces"`
 	DefaultWorkspace string      `json:"default_workspace,omitempty"`
+	ShortAlias       bool        `json:"short_alias,omitempty"`
 }
 
 type ResolveResult struct {

@@ -19,6 +19,7 @@ Claude Code stores everything in `~/.claude`. If you work across multiple projec
 - **Per-workspace API keys** — use different Anthropic API keys per project
 - **Worktree mode** — auto-pass `--worktree` to Claude per workspace, bypass with `--no-worktree`
 - **Disable attributions** — remove "Made with Claude Code" from commits and PRs per workspace
+- **Short alias** — optionally define `c` as a shorthand for `claude`
 - **TUI manager** — add, configure, and delete workspaces interactively
 - **Shell integration** — supports zsh, bash, and fish
 
@@ -83,6 +84,7 @@ Opens an interactive manager:
 |-----|--------|
 | `a` | Add workspace |
 | `o` | Edit workspace options |
+| `g` | General options |
 | `s` | Toggle default workspace (shown with ★) |
 | `d` / `x` | Delete workspace |
 | `↑` / `↓` | Navigate |
@@ -98,6 +100,12 @@ Press `o` to configure a workspace:
 
 - **Disable attributions** — removes "Made with Claude Code" from commits and PRs
 - **Always use worktree** — automatically passes `--worktree` to Claude. Bypass for a single session with `claude --no-worktree`
+
+### General options
+
+Press `g` to configure global settings:
+
+- **Short alias** — defines `c` as a shorthand for `claude` (requires shell restart to take effect)
 
 ### Commands
 
