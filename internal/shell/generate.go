@@ -157,9 +157,6 @@ func Install(bin, sh string) (string, error) {
 	}
 
 	content := string(data)
-	if strings.Contains(content, marker) {
-		return rc, fmt.Errorf("already installed in %s", rc)
-	}
 
 	var line string
 	switch sh {
@@ -167,6 +164,26 @@ func Install(bin, sh string) (string, error) {
 		line = fishEvalLine(bin, sh)
 	default:
 		line = evalLine(bin, sh)
+	}
+
+	if strings.Contains(content, marker) {
+		// Replace existing eval block (marker + next line) with the new one
+		lines := strings.Split(content, "\n")
+		var result []string
+		for i := 0; i < len(lines); i++ {
+			if strings.TrimSpace(lines[i]) == marker {
+				// Skip the marker and the eval line that follows it
+				i++ // skip eval line
+				continue
+			}
+			result = append(result, lines[i])
+		}
+		// Remove trailing empty lines before appending
+		for len(result) > 0 && result[len(result)-1] == "" {
+			result = result[:len(result)-1]
+		}
+		content = strings.Join(result, "\n") + "\n" + line + "\n"
+		return rc, os.WriteFile(rc, []byte(content), 0644)
 	}
 
 	// Ensure trailing newline before appending
