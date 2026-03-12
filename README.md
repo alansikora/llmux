@@ -17,7 +17,7 @@ Claude Code stores everything in `~/.claude`. If you work across multiple projec
 - **Automatic routing** — `claude` resolves the right workspace based on your current directory
 - **Default workspace** — set a fallback workspace for directories without a match
 - **Per-workspace API keys** — use different Anthropic API keys per project
-- **Worktree mode** — auto-pass `--worktree` to Claude per workspace, bypass with `--no-worktree`
+- **Worktree mode** — auto-pass `--worktree` to Claude per workspace, bypass with `--no-worktree` / `-nw`
 - **Worktree session management** — list, apply, and revert Claude worktree session changes for testing
 - **Disable attributions** — remove "Made with Claude Code" from commits and PRs per workspace
 - **Short alias** — optionally define `c` as a shorthand for `claude`
@@ -101,7 +101,7 @@ Press `s` to set a workspace as the default. When you run `claude` from a direct
 Press `o` to configure a workspace:
 
 - **Disable attributions** — removes "Made with Claude Code" from commits and PRs
-- **Always use worktree** — automatically passes `--worktree` to Claude. Bypass for a single session with `claude --no-worktree`
+- **Always use worktree** — automatically passes `--worktree` to Claude. Bypass for a single session with `claude --no-worktree` (or `-nw`)
 
 ### Worktree sessions
 
@@ -153,7 +153,7 @@ claude() {
 
 When you run `claude` in any directory, the wrapper calls `llmux resolve` to find the matching workspace using longest-prefix path matching. The resolved session directory is passed as `CLAUDE_CONFIG_DIR`.
 
-If the workspace has **Always use worktree** enabled, the wrapper also runs `git fetch origin <default-branch>` before launching Claude — so the worktree is always based on an up-to-date branch. The fetch is a best-effort no-op if there's no remote, no network, or `origin/HEAD` isn't set. Pass `--no-worktree` to skip both the fetch and the worktree for a single session.
+If the workspace has **Always use worktree** enabled, the wrapper also runs `git fetch origin <default-branch>` before launching Claude — so the worktree is always based on an up-to-date branch. The fetch is a best-effort no-op if there's no remote, no network, or `origin/HEAD` isn't set. Pass `--no-worktree` (or `-nw`) to skip both the fetch and the worktree for a single session.
 
 Workspaces and sessions are stored in `~/.config/llmux/`:
 
