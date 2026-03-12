@@ -106,18 +106,24 @@ After running `llmux init zsh`, your shell has a thin `claude()` wrapper:
 
 ```bash
 claude() {
-  local config_dir
-  config_dir="$(/path/to/llmux resolve "$(pwd -P)")"
+  local resolve_output config_dir api_key worktree_flag
+  resolve_output="$(/path/to/llmux resolve "$(pwd -P)")"
   if [ $? -ne 0 ]; then
     echo "llmux: no workspace configured for $(pwd -P)" >&2
     echo "Run 'llmux' to manage workspaces." >&2
     return 1
   fi
-  CLAUDE_CONFIG_DIR="$config_dir" command claude "$@"
+  config_dir="$(echo "$resolve_output" | head -n1)"
+  api_key="$(echo "$resolve_output" | sed -n '2p')"
+  worktree_flag="$(echo "$resolve_output" | sed -n '3p')"
+  # ... worktree and API key handling
+  CLAUDE_CONFIG_DIR="$config_dir" command claude "${args[@]}"
 }
 ```
 
 When you run `claude` in any directory, the wrapper calls `llmux resolve` to find the matching workspace using longest-prefix path matching. The resolved session directory is passed as `CLAUDE_CONFIG_DIR`.
+
+If the workspace has **Always use worktree** enabled, the wrapper also runs `git fetch origin <default-branch>` before launching Claude — so the worktree is always based on an up-to-date branch. The fetch is a best-effort no-op if there's no remote, no network, or `origin/HEAD` isn't set. Pass `--no-worktree` to skip both the fetch and the worktree for a single session.
 
 Workspaces and sessions are stored in `~/.config/llmux/`:
 
