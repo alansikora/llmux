@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"syscall"
 
+	"github.com/allskar/llmux/internal/commands"
 	"github.com/allskar/llmux/internal/config"
 	"github.com/allskar/llmux/internal/worktree"
 	"github.com/spf13/cobra"
@@ -57,7 +58,7 @@ var resumeCmd = &cobra.Command{
 		}
 
 		sessionDir := config.SessionDir(ws.Name)
-		ensureCommandsSymlink(sessionDir)
+		commands.Ensure()
 
 		env := os.Environ()
 		env = setEnv(env, "CLAUDE_CONFIG_DIR", sessionDir)
