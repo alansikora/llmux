@@ -38,7 +38,7 @@ var applyCmd = &cobra.Command{
 			}
 		}
 
-		if err := worktree.Apply(sessionsPath, args[0]); err != nil {
+		if err := worktree.Apply(sessionsPath, args[0], cfg.ApplyMarker); err != nil {
 			return err
 		}
 

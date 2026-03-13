@@ -139,7 +139,8 @@ func updateList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "o":
 			m.generalOptionsData = generalOptionsFormData{
-				ShortAlias: m.cfg.ShortAlias,
+				ShortAlias:  m.cfg.ShortAlias,
+				ApplyMarker: m.cfg.ApplyMarker,
 			}
 			m.generalOptionsForm = newGeneralOptionsForm(&m.generalOptionsData, m.generalOptionsData)
 			m.state = stateGeneralOptions

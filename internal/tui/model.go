@@ -234,6 +234,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if m.generalOptionsForm.State == huh.StateCompleted {
 			m.cfg.ShortAlias = m.generalOptionsData.ShortAlias
+			m.cfg.ApplyMarker = m.generalOptionsData.ApplyMarker
 			config.Save(m.cfg)
 			m.state = stateList
 			m.refreshList()

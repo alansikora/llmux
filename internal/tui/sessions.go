@@ -69,9 +69,9 @@ func deleteSessionCmd(wsPath, sessionName string, force bool) tea.Cmd {
 	}
 }
 
-func applySessionCmd(wsPath, sessionName string) tea.Cmd {
+func applySessionCmd(wsPath, sessionName string, applyMarker bool) tea.Cmd {
 	return func() tea.Msg {
-		err := worktree.Apply(wsPath, sessionName)
+		err := worktree.Apply(wsPath, sessionName, applyMarker)
 		return applyResultMsg{err: err, session: sessionName}
 	}
 }
@@ -140,7 +140,7 @@ func updateSessions(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 				m.sessionsStatus = fmt.Sprintf("applying %s...", item.name)
-				return m, applySessionCmd(item.workspacePath, item.name)
+				return m, applySessionCmd(item.workspacePath, item.name, m.cfg.ApplyMarker)
 			}
 		case "u":
 			wsPath, applied, ok := worktree.FindAppliedWorkspace(sessionsFromList(m.sessionsList))
