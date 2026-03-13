@@ -86,7 +86,18 @@ func HasAppliedSession(workspacePath string) (string, bool) {
 	return state.Session, true
 }
 
-func Apply(workspacePath, sessionName string) error {
+const MarkerFileName = ".llmux-applied"
+
+func writeMarker(workspacePath, sessionName, branch string) error {
+	content := fmt.Sprintf("session: %s\nbranch: %s\n", sessionName, branch)
+	return os.WriteFile(filepath.Join(workspacePath, MarkerFileName), []byte(content), 0644)
+}
+
+func removeMarker(workspacePath string) {
+	os.Remove(filepath.Join(workspacePath, MarkerFileName))
+}
+
+func Apply(workspacePath, sessionName string, applyMarker ...bool) error {
 	if applied, ok := HasAppliedSession(workspacePath); ok {
 		return fmt.Errorf("session %q is already applied; run 'llmux unapply' first", applied)
 	}
@@ -158,6 +169,11 @@ func Apply(workspacePath, sessionName string) error {
 		return fmt.Errorf("saving state: %w", err)
 	}
 
+	// Write marker file if enabled
+	if len(applyMarker) > 0 && applyMarker[0] {
+		writeMarker(workspacePath, sessionName, session.Branch)
+	}
+
 	return nil
 }
 
@@ -169,6 +185,9 @@ func Unapply(workspacePath string) error {
 	if state == nil {
 		return fmt.Errorf("no session is currently applied")
 	}
+
+	// Remove marker file if present
+	removeMarker(workspacePath)
 
 	// Discard applied changes
 	if _, err := runGit(workspacePath, "checkout", "."); err != nil {
