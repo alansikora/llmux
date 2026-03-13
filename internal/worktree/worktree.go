@@ -5,17 +5,25 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 )
 
+const StaleDuration = 7 * 24 * time.Hour
+
 type Session struct {
 	Name          string
 	Branch        string
 	ChangedFiles  int
+	LastActivity  time.Time
 	Path          string
 	WorkspacePath string
+}
+
+func (s Session) IsStale() bool {
+	return !s.LastActivity.IsZero() && time.Since(s.LastActivity) > StaleDuration
 }
 
 func WorktreesDir(workspacePath string) string {
@@ -51,8 +59,10 @@ func ListSessions(workspacePath string) ([]Session, error) {
 			continue
 		}
 
+		trimmedBranch := strings.TrimSpace(branch)
+
 		changedFiles := 0
-		stat, err := runGit(workspacePath, "diff", "--stat", "HEAD..."+strings.TrimSpace(branch))
+		stat, err := runGit(workspacePath, "diff", "--stat", "HEAD..."+trimmedBranch)
 		if err == nil {
 			lines := strings.Split(strings.TrimSpace(stat), "\n")
 			if len(lines) > 0 {
@@ -66,14 +76,26 @@ func ListSessions(workspacePath string) ([]Session, error) {
 			}
 		}
 
+		var lastActivity time.Time
+		if ts, err := runGit(wtPath, "log", "-1", "--format=%ct"); err == nil {
+			if epoch, err := strconv.ParseInt(strings.TrimSpace(ts), 10, 64); err == nil {
+				lastActivity = time.Unix(epoch, 0)
+			}
+		}
+
 		sessions = append(sessions, Session{
 			Name:          entry.Name(),
-			Branch:        strings.TrimSpace(branch),
+			Branch:        trimmedBranch,
 			ChangedFiles:  changedFiles,
+			LastActivity:  lastActivity,
 			Path:          wtPath,
 			WorkspacePath: workspacePath,
 		})
 	}
+
+	sort.Slice(sessions, func(i, j int) bool {
+		return sessions[i].LastActivity.After(sessions[j].LastActivity)
+	})
 
 	return sessions, nil
 }
@@ -188,6 +210,11 @@ func Unapply(workspacePath string) error {
 
 	// Remove marker file if present
 	removeMarker(workspacePath)
+
+	// Unstage any staged changes (git apply --3way stages files)
+	if _, err := runGit(workspacePath, "reset", "HEAD"); err != nil {
+		return fmt.Errorf("unstaging changes: %w", err)
+	}
 
 	// Discard applied changes
 	if _, err := runGit(workspacePath, "checkout", "."); err != nil {

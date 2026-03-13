@@ -31,4 +31,7 @@ var (
 	hintStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241")).
 			Italic(true)
+
+	staleStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("243"))
 )
