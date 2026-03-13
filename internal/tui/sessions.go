@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/allskar/llmux/internal/worktree"
 	"github.com/charmbracelet/bubbles/key"
@@ -13,6 +14,7 @@ type sessionItem struct {
 	name          string
 	branch        string
 	changedFiles  int
+	lastActivity  time.Time
 	applied       bool
 	workspacePath string
 }
@@ -26,7 +28,52 @@ func (s sessionItem) Title() string {
 }
 
 func (s sessionItem) Description() string {
-	return fmt.Sprintf("%s · %d files changed", s.branch, s.changedFiles)
+	desc := fmt.Sprintf("%s · %d files changed", s.branch, s.changedFiles)
+	if !s.lastActivity.IsZero() {
+		age := relativeTime(s.lastActivity)
+		if s.isStale() {
+			desc += staleStyle.Render(fmt.Sprintf(" · %s (stale)", age))
+		} else {
+			desc += fmt.Sprintf(" · %s", age)
+		}
+	}
+	return desc
+}
+
+func (s sessionItem) isStale() bool {
+	return !s.lastActivity.IsZero() && time.Since(s.lastActivity) > worktree.StaleDuration
+}
+
+func relativeTime(t time.Time) string {
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		m := int(d.Minutes())
+		if m == 1 {
+			return "1m ago"
+		}
+		return fmt.Sprintf("%dm ago", m)
+	case d < 24*time.Hour:
+		h := int(d.Hours())
+		if h == 1 {
+			return "1h ago"
+		}
+		return fmt.Sprintf("%dh ago", h)
+	case d < 7*24*time.Hour:
+		days := int(d.Hours() / 24)
+		if days == 1 {
+			return "1d ago"
+		}
+		return fmt.Sprintf("%dd ago", days)
+	default:
+		weeks := int(d.Hours() / 24 / 7)
+		if weeks == 1 {
+			return "1w ago"
+		}
+		return fmt.Sprintf("%dw ago", weeks)
+	}
 }
 
 func (s sessionItem) FilterValue() string { return s.name }
@@ -90,6 +137,7 @@ func buildSessionsList(sessions []worktree.Session, applied string, width, heigh
 			name:          s.Name,
 			branch:        s.Branch,
 			changedFiles:  s.ChangedFiles,
+			lastActivity:  s.LastActivity,
 			applied:       s.Name == applied,
 			workspacePath: s.WorkspacePath,
 		}
