@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/allskar/llmux/internal/commands"
 	"github.com/allskar/llmux/internal/config"
 	"github.com/allskar/llmux/internal/shell"
 	"github.com/spf13/cobra"
@@ -44,6 +45,12 @@ var initCmd = &cobra.Command{
 		}
 		fmt.Printf("Added llmux shell integration to %s\n", rc)
 		fmt.Println("Restart your shell or run: source", rc)
+
+		cmdDir, err := commands.Install()
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Installed Claude Code slash commands to %s\n", cmdDir)
 		return nil
 	},
 }

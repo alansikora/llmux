@@ -30,6 +30,22 @@ func WorktreesDir(workspacePath string) string {
 	return filepath.Join(workspacePath, ".claude", "worktrees")
 }
 
+// DetectCurrentSession checks if cwd is inside a .claude/worktrees/{name}/
+// directory and returns the session name if so.
+func DetectCurrentSession(cwd string) (string, error) {
+	abs, err := filepath.Abs(cwd)
+	if err != nil {
+		return "", err
+	}
+	parts := strings.Split(filepath.ToSlash(abs), "/")
+	for i := len(parts) - 1; i >= 2; i-- {
+		if parts[i-1] == "worktrees" && parts[i-2] == ".claude" {
+			return parts[i], nil
+		}
+	}
+	return "", fmt.Errorf("not inside a worktree session")
+}
+
 func ListSessions(workspacePath string) ([]Session, error) {
 	dir := WorktreesDir(workspacePath)
 	entries, err := os.ReadDir(dir)
