@@ -2,6 +2,9 @@ package tui
 
 import (
 	"fmt"
+	"os/exec"
+	"runtime"
+	"strings"
 	"time"
 
 	"github.com/allskar/llmux/internal/worktree"
@@ -16,7 +19,14 @@ type sessionItem struct {
 	changedFiles  int
 	lastActivity  time.Time
 	applied       bool
+	stale         bool
 	workspacePath string
+	path          string
+}
+
+type clipboardResultMsg struct {
+	err  error
+	path string
 }
 
 func (s sessionItem) Title() string {
@@ -31,17 +41,14 @@ func (s sessionItem) Description() string {
 	desc := fmt.Sprintf("%s · %d files changed", s.branch, s.changedFiles)
 	if !s.lastActivity.IsZero() {
 		age := relativeTime(s.lastActivity)
-		if s.isStale() {
+		if s.stale {
 			desc += staleStyle.Render(fmt.Sprintf(" · %s (stale)", age))
 		} else {
 			desc += fmt.Sprintf(" · %s", age)
 		}
 	}
+	desc += "\n" + dimStyle.Render(s.path)
 	return desc
-}
-
-func (s sessionItem) isStale() bool {
-	return !s.lastActivity.IsZero() && time.Since(s.lastActivity) > worktree.StaleDuration
 }
 
 func relativeTime(t time.Time) string {
@@ -77,6 +84,20 @@ func relativeTime(t time.Time) string {
 }
 
 func (s sessionItem) FilterValue() string { return s.name }
+
+func copyToClipboard(text string) error {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("pbcopy")
+	case "linux":
+		cmd = exec.Command("xclip", "-selection", "clipboard")
+	default:
+		return fmt.Errorf("clipboard not supported on %s", runtime.GOOS)
+	}
+	cmd.Stdin = strings.NewReader(text)
+	return cmd.Run()
+}
 
 // Messages for async operations
 type sessionsLoadedMsg struct {
@@ -139,11 +160,14 @@ func buildSessionsList(sessions []worktree.Session, applied string, width, heigh
 			changedFiles:  s.ChangedFiles,
 			lastActivity:  s.LastActivity,
 			applied:       s.Name == applied,
+			stale:         s.IsStale(),
 			workspacePath: s.WorkspacePath,
+			path:          s.Path,
 		}
 	}
 
 	delegate := list.NewDefaultDelegate()
+	delegate.SetHeight(3)
 	l := list.New(items, delegate, width, height)
 	l.Title = "Worktree Sessions"
 	l.SetShowStatusBar(true)
@@ -152,6 +176,7 @@ func buildSessionsList(sessions []worktree.Session, applied string, width, heigh
 		return []key.Binding{
 			key.NewBinding(key.WithKeys("a", "enter"), key.WithHelp("a/enter", "apply")),
 			key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "unapply")),
+			key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "copy path")),
 			key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete")),
 			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
 		}
@@ -198,6 +223,14 @@ func updateSessions(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.sessionsStatus = fmt.Sprintf("unapplying %s...", applied)
 			return m, unapplySessionCmd(wsPath)
+		case "c":
+			if item, ok := m.sessionsList.SelectedItem().(sessionItem); ok {
+				path := item.path
+				return m, func() tea.Msg {
+					err := copyToClipboard(path)
+					return clipboardResultMsg{err: err, path: path}
+				}
+			}
 		case "d":
 			if item, ok := m.sessionsList.SelectedItem().(sessionItem); ok {
 				m.sessionsStatus = fmt.Sprintf("deleting %s...", item.name)

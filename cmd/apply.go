@@ -10,13 +10,29 @@ import (
 )
 
 var applyCmd = &cobra.Command{
-	Use:   "apply <session>",
+	Use:   "apply [session]",
 	Short: "Apply worktree session changes to the main working tree",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {
 			return err
+		}
+
+		cwd, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+
+		var sessionName string
+		if len(args) > 0 {
+			sessionName = args[0]
+		} else {
+			detected, err := worktree.DetectCurrentSession(cwd)
+			if err != nil {
+				return fmt.Errorf("no session name provided and not inside a worktree: %w", err)
+			}
+			sessionName = detected
 		}
 
 		var wsArgs []string
@@ -32,17 +48,14 @@ var applyCmd = &cobra.Command{
 		// that sessions stored in {repo}/.claude/worktrees/ are found correctly.
 		sessionsPath := ws.Path
 		if applyWorkspace == "" {
-			cwd, err := os.Getwd()
-			if err == nil {
-				sessionsPath = worktree.ResolveSessionsPath(cwd)
-			}
+			sessionsPath = worktree.ResolveSessionsPath(cwd)
 		}
 
-		if err := worktree.Apply(sessionsPath, args[0], cfg.ApplyMarker); err != nil {
+		if err := worktree.Apply(sessionsPath, sessionName, cfg.ApplyMarker); err != nil {
 			return err
 		}
 
-		fmt.Printf("Applied session %q to %s\n", args[0], sessionsPath)
+		fmt.Printf("Applied session %q to %s\n", sessionName, sessionsPath)
 		return nil
 	},
 }

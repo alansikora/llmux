@@ -38,15 +38,18 @@ func snippet(bin string) string {
   worktree_flag="$(echo "$resolve_output" | sed -n '3p')"
   local args=("$@")
   if [ "$worktree_flag" = "--worktree" ]; then
-    local no_worktree=false filtered=()
+    local skip_worktree=false filtered=()
     for arg in "${args[@]}"; do
       if [ "$arg" = "--no-worktree" ] || [ "$arg" = "-nw" ]; then
-        no_worktree=true
+        skip_worktree=true
+      elif [ "$arg" = "--worktree" ] || [ "$arg" = "--resume" ] || [ "$arg" = "--continue" ] || [ "$arg" = "-r" ] || [ "$arg" = "-c" ]; then
+        skip_worktree=true
+        filtered+=("$arg")
       else
         filtered+=("$arg")
       fi
     done
-    if [ "$no_worktree" = false ]; then
+    if [ "$skip_worktree" = false ]; then
       local default_branch
       default_branch="$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')"
       if [ -n "$default_branch" ]; then
@@ -85,15 +88,18 @@ func fishSnippet(bin string) string {
   set -l args $argv
   if test "$worktree_flag" = "--worktree"
     set -l filtered
-    set -l no_worktree false
+    set -l skip_worktree false
     for arg in $args
       if test "$arg" = "--no-worktree" -o "$arg" = "-nw"
-        set no_worktree true
+        set skip_worktree true
+      else if test "$arg" = "--worktree" -o "$arg" = "--resume" -o "$arg" = "--continue" -o "$arg" = "-r" -o "$arg" = "-c"
+        set skip_worktree true
+        set -a filtered $arg
       else
         set -a filtered $arg
       end
     end
-    if test "$no_worktree" = false
+    if test "$skip_worktree" = false
       set -l default_branch (git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
       if test -n "$default_branch"
         git fetch origin $default_branch 2>/dev/null
@@ -182,13 +188,17 @@ func Install(bin, sh string) (string, error) {
 		for len(result) > 0 && result[len(result)-1] == "" {
 			result = result[:len(result)-1]
 		}
-		content = strings.Join(result, "\n") + "\n" + line + "\n"
+		content = strings.Join(result, "\n") + "\n\n" + line + "\n"
 		return rc, os.WriteFile(rc, []byte(content), 0644)
 	}
 
-	// Ensure trailing newline before appending
-	if len(content) > 0 && !strings.HasSuffix(content, "\n") {
-		line = "\n" + line
+	// Ensure blank line before the marker for readability
+	if len(content) > 0 && !strings.HasSuffix(content, "\n\n") {
+		if strings.HasSuffix(content, "\n") {
+			line = "\n" + line
+		} else {
+			line = "\n\n" + line
+		}
 	}
 
 	f, err := os.OpenFile(rc, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)

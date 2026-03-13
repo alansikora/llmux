@@ -121,6 +121,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.sessionsStatus = fmt.Sprintf("deleted %s", msg.session)
 		return m, loadSessionsCmd(m.sessionsPath, m.sessionsTarget)
+	case clipboardResultMsg:
+		if msg.err != nil {
+			m.sessionsStatus = fmt.Sprintf("copy failed: %v", msg.err)
+		} else {
+			m.sessionsStatus = fmt.Sprintf("copied path: %s", msg.path)
+		}
+		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height

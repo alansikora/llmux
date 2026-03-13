@@ -9,6 +9,27 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// ensureCommandsSymlink creates a symlink from the session's commands directory
+// to ~/.claude/commands so that user-level slash commands are available when
+// CLAUDE_CONFIG_DIR is overridden.
+func ensureCommandsSymlink(sessionDir string) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	src := filepath.Join(home, ".claude", "commands")
+	if _, err := os.Stat(src); err != nil {
+		return
+	}
+	dst := filepath.Join(sessionDir, "commands")
+	// Already exists (symlink or real dir) — skip
+	if _, err := os.Lstat(dst); err == nil {
+		return
+	}
+	os.MkdirAll(sessionDir, 0755)
+	os.Symlink(src, dst)
+}
+
 // isGitRepo checks whether dir (or any ancestor) contains a .git entry.
 func isGitRepo(dir string) bool {
 	dir = filepath.Clean(dir)
@@ -41,6 +62,8 @@ var resolveCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		ensureCommandsSymlink(result.SessionDir)
 
 		fmt.Fprint(os.Stderr, "\033[90m↳ account: "+result.WorkspaceName+"\033[0m\n")
 		fmt.Print(result.SessionDir)

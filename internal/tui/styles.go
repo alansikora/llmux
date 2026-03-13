@@ -34,4 +34,7 @@ var (
 
 	staleStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("243"))
+
+	dimStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("243"))
 )
