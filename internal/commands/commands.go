@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/allskar/llmux/internal/config"
 )
 
 var commands = map[string]string{
@@ -17,7 +19,9 @@ If no session is currently applied, let the user know.
 `,
 }
 
-// Install writes the llmux slash commands to ~/.claude/commands/llmux/.
+// Install writes the llmux slash commands to ~/.claude/commands/llmux/
+// and ensures all existing session directories have a symlink to
+// ~/.claude/commands so commands are available in every workspace.
 // Returns the directory path where commands were installed.
 func Install() (string, error) {
 	home, err := os.UserHomeDir()
@@ -25,15 +29,15 @@ func Install() (string, error) {
 		return "", err
 	}
 
-	dir := filepath.Join(home, ".claude", "commands", "llmux")
+	commandsDir := filepath.Join(home, ".claude", "commands")
+	dir := filepath.Join(commandsDir, "llmux")
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", fmt.Errorf("creating commands directory: %w", err)
 	}
 
 	// Clean up old top-level commands from previous installs
-	oldDir := filepath.Join(home, ".claude", "commands")
 	for name := range commands {
-		os.Remove(filepath.Join(oldDir, name+".md"))
+		os.Remove(filepath.Join(commandsDir, name+".md"))
 	}
 
 	for name, content := range commands {
@@ -43,5 +47,50 @@ func Install() (string, error) {
 		}
 	}
 
+	// Ensure all existing session directories have the commands symlink.
+	// This covers workspaces that were resolved before commands were installed
+	// (e.g. after an upgrade).
+	EnsureSessionSymlinks(commandsDir)
+
 	return dir, nil
+}
+
+// Ensure installs commands if missing and ensures all session symlinks exist.
+// It is idempotent and cheap to call on every resolve.
+func Ensure() {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	commandsDir := filepath.Join(home, ".claude", "commands")
+	dir := filepath.Join(commandsDir, "llmux")
+
+	// Install command files if the directory doesn't exist yet
+	// (e.g. binary was upgraded but `llmux init` wasn't re-run).
+	if _, err := os.Stat(dir); err != nil {
+		Install() //nolint: errcheck
+	}
+
+	EnsureSessionSymlinks(commandsDir)
+}
+
+// EnsureSessionSymlinks creates commands symlinks in all existing session
+// directories that don't already have one. It is idempotent and safe to call
+// on every resolve (i.e. every `claude` invocation).
+func EnsureSessionSymlinks(commandsDir string) {
+	sessionsDir := filepath.Join(config.ConfigDir(), "sessions")
+	entries, err := os.ReadDir(sessionsDir)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		dst := filepath.Join(sessionsDir, e.Name(), "commands")
+		if _, err := os.Lstat(dst); err == nil {
+			continue // already exists
+		}
+		os.Symlink(commandsDir, dst)
+	}
 }
