@@ -18,7 +18,9 @@ Claude Code stores everything in `~/.claude`. If you work across multiple projec
 - **Default workspace** — set a fallback workspace for directories without a match
 - **Per-workspace API keys** — use different Anthropic API keys per project
 - **Worktree mode** — auto-pass `--worktree` to Claude per workspace, bypass with `--no-worktree` / `-nw`
-- **Worktree session management** — list, apply, and revert Claude worktree session changes for testing
+- **Worktree session management** — list, apply, revert, and resume Claude worktree sessions
+- **Session resume** — resume a worktree session by name or branch with `llmux resume`
+- **Slash commands** — `/llmux apply` and `/llmux unapply` available inside Claude Code sessions
 - **Disable attributions** — remove "Made with Claude Code" from commits and PRs per workspace
 - **Short alias** — optionally define `c` as a shorthand for `claude`
 - **TUI manager** — add, configure, and delete workspaces interactively
@@ -105,17 +107,37 @@ Press `enter` on a workspace to configure it:
 
 ### Worktree sessions
 
-When Claude Code runs with `--worktree`, it creates a git worktree under `.claude/worktrees/` with changes on a separate branch. Use these commands to apply those changes to your main working tree for testing:
+When Claude Code runs with `--worktree`, it creates a git worktree under `.claude/worktrees/` with changes on a separate branch. Use these commands to manage those sessions:
 
 ```bash
 llmux sessions              # list worktree sessions for the current workspace
-llmux apply <session>       # apply session changes as uncommitted diffs on main
+llmux resume <name>         # resume a session by name or branch (launches claude --continue)
+llmux apply [session]       # apply session changes as uncommitted diffs on main
 llmux unapply               # revert applied changes (restores any auto-stashed state)
 ```
 
-Changes are applied as uncommitted modifications — no merge commits. If your working tree is dirty when you run `apply`, llmux auto-stashes first and restores on `unapply`.
+`llmux resume` finds the worktree, sets up the workspace environment, and launches Claude directly inside it — no need to manually `cd` or pass `--no-worktree`.
 
-You can also browse and manage sessions from the TUI by pressing `w` on a workspace.
+`llmux apply` auto-detects the session name when run from inside a worktree. Changes are applied as uncommitted modifications — no merge commits. If your working tree is dirty, llmux auto-stashes first and restores on `unapply`.
+
+You can also browse and manage sessions from the TUI by pressing `w` on a workspace:
+
+| Key | Action |
+|-----|--------|
+| `a` / `enter` | Apply session |
+| `u` | Unapply current session |
+| `c` | Copy worktree path to clipboard |
+| `d` | Delete session |
+| `esc` | Back to workspace list |
+
+### Slash commands
+
+llmux installs Claude Code slash commands during `llmux init`:
+
+- `/llmux apply` — apply the current worktree session's changes to the main workspace
+- `/llmux unapply` — revert previously applied changes
+
+These work inside any Claude Code session, including worktree sessions. The shell wrapper automatically skips adding `--worktree` when you use `--resume` or `--continue`, so resuming existing sessions works without needing `--no-worktree`.
 
 ### General options
 
@@ -123,10 +145,15 @@ Press `o` to configure global settings:
 
 - **Short alias** — defines `c` as a shorthand for `claude` (requires shell restart to take effect)
 
-### Commands
+### CLI commands
 
 ```bash
+llmux                   # open the TUI manager
 llmux list              # list all workspaces with auth status
+llmux sessions          # list worktree sessions for the current workspace
+llmux resume <name>     # resume a worktree session by name or branch
+llmux apply [session]   # apply worktree session changes to main
+llmux unapply           # revert applied changes
 llmux init zsh --print  # print the shell function without installing
 ```
 
