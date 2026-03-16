@@ -12,6 +12,17 @@ import (
 
 var Version = "dev"
 
+// DisplayVersion returns the version formatted for display.
+// Release versions keep their "v" prefix (e.g. "v1.2.3").
+// Non-release versions like "canary" or "dev" have any "v" prefix stripped.
+func DisplayVersion() string {
+	v := Version
+	if len(v) > 1 && v[0] == 'v' && (v[1] < '0' || v[1] > '9') {
+		v = v[1:]
+	}
+	return v
+}
+
 var rootCmd = &cobra.Command{
 	Use:   "llmux",
 	Short: "Claude workspace manager",
@@ -22,7 +33,7 @@ var rootCmd = &cobra.Command{
 			return fmt.Errorf("loading config: %w", err)
 		}
 
-		m := tui.NewModel(cfg, Version)
+		m := tui.NewModel(cfg, DisplayVersion())
 		p := tea.NewProgram(m, tea.WithAltScreen())
 		if _, err := p.Run(); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -33,6 +44,6 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() error {
-	rootCmd.Version = Version
+	rootCmd.Version = DisplayVersion()
 	return rootCmd.Execute()
 }
