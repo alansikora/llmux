@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -40,13 +41,21 @@ var resolveCmd = &cobra.Command{
 
 		result, err := cfg.Resolve(args[0])
 		if err != nil {
+			if errors.Is(err, config.ErrUnmapped) {
+				os.Exit(2)
+			}
 			return err
 		}
 
 		commands.Ensure()
 
 		fmt.Fprint(os.Stderr, "\033[90m↳ llmux "+DisplayVersion()+"\033[0m\n")
-		fmt.Fprint(os.Stderr, "\033[90m↳ account: "+result.WorkspaceName+"\033[0m\n")
+		if result.ProjectPath != "" {
+			projectName := filepath.Base(result.ProjectPath)
+			fmt.Fprintf(os.Stderr, "\033[90m↳ workspace: %s · project: %s\033[0m\n", result.WorkspaceName, projectName)
+		} else {
+			fmt.Fprintf(os.Stderr, "\033[90m↳ workspace: %s (default)\033[0m\n", result.WorkspaceName)
+		}
 		fmt.Print(result.SessionDir)
 		if result.APIKey != "" {
 			fmt.Print("\n" + result.APIKey)

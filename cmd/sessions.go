@@ -19,21 +19,19 @@ var sessionsCmd = &cobra.Command{
 			return err
 		}
 
-		ws, err := resolveWorkspace(cfg, args)
+		ws, _, err := resolveWorkspace(cfg, args)
 		if err != nil {
 			return err
 		}
 
-		// When no explicit workspace was given, prefer the git repo root over
-		// the (potentially broader) workspace path so that sessions stored in
-		// {repo}/.claude/worktrees/ are found correctly.
-		sessionsPath := ws.Path
-		if len(args) == 0 {
-			cwd, err := os.Getwd()
-			if err == nil {
-				sessionsPath = worktree.ResolveSessionsPath(cwd)
-			}
+		// Prefer git repo root for finding sessions
+		cwd, err := os.Getwd()
+		if err != nil {
+			return err
 		}
+		sessionsPath := worktree.ResolveSessionsPath(cwd)
+
+		_ = ws // workspace used for session dir context if needed
 
 		sessions, err := worktree.ListSessions(sessionsPath)
 		if err != nil {
@@ -58,15 +56,18 @@ var sessionsCmd = &cobra.Command{
 	},
 }
 
-func resolveWorkspace(cfg *config.Config, args []string) (*config.Workspace, error) {
+// resolveWorkspace finds the workspace (and optionally project) for the given args.
+// If args has a name, looks up by workspace name. Otherwise uses cwd to find project → workspace.
+func resolveWorkspace(cfg *config.Config, args []string) (*config.Workspace, *config.Project, error) {
 	if len(args) > 0 {
-		return cfg.FindWorkspace(args[0])
+		ws, err := cfg.FindWorkspace(args[0])
+		return ws, nil, err
 	}
 	cwd, err := os.Getwd()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return cfg.FindWorkspace(cwd)
+	return cfg.FindWorkspaceForDir(cwd)
 }
 
 func init() {

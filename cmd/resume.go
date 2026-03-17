@@ -25,7 +25,7 @@ var resumeCmd = &cobra.Command{
 			return err
 		}
 
-		ws, err := resolveWorkspace(cfg, nil)
+		ws, _, err := resolveWorkspace(cfg, nil)
 		if err != nil {
 			return err
 		}

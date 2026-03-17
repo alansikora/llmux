@@ -39,17 +39,13 @@ var applyCmd = &cobra.Command{
 		if applyWorkspace != "" {
 			wsArgs = []string{applyWorkspace}
 		}
-		ws, err := resolveWorkspace(cfg, wsArgs)
+		_, _, err = resolveWorkspace(cfg, wsArgs)
 		if err != nil {
 			return err
 		}
 
-		// When no explicit workspace was given, prefer the git repo root so
-		// that sessions stored in {repo}/.claude/worktrees/ are found correctly.
-		sessionsPath := ws.Path
-		if applyWorkspace == "" {
-			sessionsPath = worktree.ResolveSessionsPath(cwd)
-		}
+		// Prefer git repo root for finding sessions
+		sessionsPath := worktree.ResolveSessionsPath(cwd)
 
 		if err := worktree.Apply(sessionsPath, sessionName, cfg.ApplyMarker); err != nil {
 			return err

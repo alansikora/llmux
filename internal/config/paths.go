@@ -35,6 +35,47 @@ func Load() (*Config, error) {
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, err
 	}
+
+	// Migrate legacy format: workspaces with "path" field → projects
+	type legacyWorkspace struct {
+		Name     string `json:"name"`
+		Path     string `json:"path,omitempty"`
+		APIKey   string `json:"api_key,omitempty"`
+		Worktree bool   `json:"worktree,omitempty"`
+	}
+	type legacyConfig struct {
+		Workspaces []legacyWorkspace `json:"workspaces"`
+	}
+
+	var legacy legacyConfig
+	if err := json.Unmarshal(data, &legacy); err == nil {
+		needsMigration := false
+		for _, lws := range legacy.Workspaces {
+			if lws.Path != "" {
+				needsMigration = true
+				break
+			}
+		}
+
+		if needsMigration {
+			cfg.Workspaces = nil
+			for _, lws := range legacy.Workspaces {
+				cfg.Workspaces = append(cfg.Workspaces, Workspace{
+					Name:     lws.Name,
+					APIKey:   lws.APIKey,
+					Worktree: lws.Worktree,
+				})
+				if lws.Path != "" {
+					cfg.Projects = append(cfg.Projects, Project{
+						Path:      lws.Path,
+						Workspace: lws.Name,
+					})
+				}
+			}
+			Save(&cfg)
+		}
+	}
+
 	return &cfg, nil
 }
 
