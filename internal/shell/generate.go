@@ -28,7 +28,11 @@ func snippet(bin string) string {
 	return fmt.Sprintf(`claude() {
   local resolve_output config_dir api_key worktree_flag
   resolve_output="$(%s resolve "$(pwd -P)")"
-  if [ $? -ne 0 ]; then
+  local resolve_status=$?
+  if [ $resolve_status -eq 2 ]; then
+    %s register "$(pwd -P)" || return 1
+    resolve_output="$(%s resolve "$(pwd -P)")" || return 1
+  elif [ $resolve_status -ne 0 ]; then
     echo "llmux: no workspace configured for $(pwd -P)" >&2
     echo "Run 'llmux' to manage workspaces." >&2
     return 1
@@ -69,13 +73,17 @@ func snippet(bin string) string {
   else
     CLAUDE_CONFIG_DIR="$config_dir" command claude "${args[@]}"
   fi
-}`, bin)
+}`, bin, bin, bin)
 }
 
 func fishSnippet(bin string) string {
 	return fmt.Sprintf(`function claude
   set -l resolve_output (string split \n (%s resolve (pwd -P)))
-  if test $status -ne 0
+  set -l resolve_status $status
+  if test $resolve_status -eq 2
+    %s register (pwd -P); or return 1
+    set resolve_output (string split \n (%s resolve (pwd -P))); or return 1
+  else if test $resolve_status -ne 0
     echo "llmux: no workspace configured for "(pwd -P) >&2
     echo "Run 'llmux' to manage workspaces." >&2
     return 1
@@ -125,7 +133,7 @@ func fishSnippet(bin string) string {
   else
     CLAUDE_CONFIG_DIR=$config_dir command claude $args
   end
-end`, bin)
+end`, bin, bin, bin)
 }
 
 const marker = "# llmux shell integration"

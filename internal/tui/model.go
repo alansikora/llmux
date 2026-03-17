@@ -15,13 +15,15 @@ import (
 type state int
 
 const (
-	stateList state = iota
-	stateAdding
-	stateAddOptions
-	stateOptions
-	stateDeleting
-	stateSessions
-	stateGeneralOptions
+	stateWorkspaceList    state = iota
+	stateWorkspaceAdding        // Add workspace (name + API key)
+	stateWorkspaceOptions       // Edit workspace settings
+	stateWorkspaceDeleting      // Delete workspace confirmation
+	stateProjectList            // List projects for a workspace
+	stateProjectAdding          // Add project to workspace
+	stateProjectOptions         // Edit project overrides
+	stateSessions               // Worktree sessions (per project)
+	stateGeneralOptions         // Global config options
 )
 
 type Model struct {
@@ -29,23 +31,32 @@ type Model struct {
 	version string
 	state   state
 
-	list   list.Model
+	list   list.Model // workspace list (main view)
 	width  int
 	height int
 
-	// Add form
-	addForm *huh.Form
-	addData addFormData
+	// Workspace add form
+	wsAddForm *huh.Form
+	wsAddData wsAddFormData
 
-	// Options form (shared by add flow and standalone options)
+	// Unified options form (used for both workspace and project)
 	optionsForm   *huh.Form
 	optionsData   optionsFormData
-	optionsTarget string
+	wsOptionsTarget   string // workspace name (when editing workspace)
+	projOptionsTarget string // project path (when editing project)
 
-	// Delete form
+	// Workspace delete
 	deleteForm   *huh.Form
 	deleteData   deleteFormData
 	deleteTarget string
+
+	// Project list (per workspace)
+	projectList    list.Model
+	projectsTarget string // workspace name
+
+	// Project add form
+	projAddForm *huh.Form
+	projAddData projAddFormData
 
 	// Sessions view
 	sessionsList   list.Model
@@ -53,10 +64,10 @@ type Model struct {
 	sessionsPath   string
 	sessionsStatus string
 
-	// Sessions loading (inline spinner on workspace list)
-	sessionsLoading  bool
-	loadingWorkspace string
-	spinner          spinner.Model
+	// Sessions loading
+	sessionsLoading bool
+	loadingProject  string
+	spinner         spinner.Model
 
 	// General options form
 	generalOptionsForm *huh.Form
@@ -67,12 +78,12 @@ func NewModel(cfg *config.Config, version string) *Model {
 	return &Model{
 		cfg:     cfg,
 		version: version,
-		state:   stateList,
+		state:   stateWorkspaceList,
 	}
 }
 
 func (m *Model) Init() tea.Cmd {
-	m.list = buildList(m.cfg, m.version, 80, 20)
+	m.list = buildWorkspaceList(m.cfg, m.version, 80, 20)
 	m.spinner = spinner.New(spinner.WithSpinner(spinner.Dot))
 	return nil
 }
@@ -83,14 +94,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.sessionsLoading {
 			var cmd tea.Cmd
 			m.spinner, cmd = m.spinner.Update(msg)
-			m.updateLoadingItem()
 			return m, cmd
 		}
 		return m, nil
 	case sessionsLoadedMsg:
 		m.sessionsLoading = false
-		m.loadingWorkspace = ""
-		m.refreshList()
+		m.loadingProject = ""
 		h, v := appStyle.GetFrameSize()
 		m.sessionsList = buildSessionsList(msg.sessions, msg.applied, m.width-h, m.height-v-7)
 		m.sessionsStatus = ""
@@ -139,93 +148,131 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
-		if msg.String() == "esc" && m.state != stateList {
-			m.sessionsLoading = false
-			m.state = stateList
-			m.refreshList()
-			return m, nil
+		if msg.String() == "esc" {
+			switch m.state {
+			case stateWorkspaceList:
+				// Don't handle esc at top level
+			case stateProjectList:
+				m.state = stateWorkspaceList
+				m.refreshWorkspaceList()
+				return m, nil
+			case stateSessions:
+				// Go back to project list
+				m.sessionsLoading = false
+				projects := m.cfg.ProjectsForWorkspace(m.projectsTarget)
+				h, v := appStyle.GetFrameSize()
+				m.projectList = buildProjectList(projects, m.projectsTarget, m.width-h, m.height-v-7)
+				m.state = stateProjectList
+				return m, nil
+			default:
+				m.sessionsLoading = false
+				// For forms, go back to appropriate parent
+				switch m.state {
+				case stateWorkspaceAdding, stateWorkspaceOptions, stateWorkspaceDeleting, stateGeneralOptions:
+					m.state = stateWorkspaceList
+					m.refreshWorkspaceList()
+				case stateProjectAdding, stateProjectOptions:
+					m.state = stateProjectList
+					m.refreshProjectList()
+				}
+				return m, nil
+			}
 		}
 	}
 
 	switch m.state {
-	case stateList:
-		return updateList(m, msg)
+	case stateWorkspaceList:
+		return updateWorkspaceList(m, msg)
 
-	case stateAdding:
-		form, cmd := m.addForm.Update(msg)
+	case stateWorkspaceAdding:
+		form, cmd := m.wsAddForm.Update(msg)
 		if f, ok := form.(*huh.Form); ok {
-			m.addForm = f
+			m.wsAddForm = f
 		}
-
-		if m.addForm.State == huh.StateCompleted {
-			// Transition to options form
-			name := m.resolveAddName()
-			m.optionsTarget = name
-			m.optionsData = optionsFormData{}
-			m.optionsForm = newOptionsForm(&m.optionsData, m.optionsData)
-			m.state = stateAddOptions
-			return m, m.optionsForm.Init()
+		if m.wsAddForm.State == huh.StateCompleted {
+			m.applyWsAdd()
+			m.state = stateWorkspaceList
+			m.refreshWorkspaceList()
+			return m, nil
 		}
-		if m.addForm.State == huh.StateAborted {
-			m.state = stateList
+		if m.wsAddForm.State == huh.StateAborted {
+			m.state = stateWorkspaceList
 			return m, nil
 		}
 		return m, cmd
 
-	case stateAddOptions:
+	case stateWorkspaceOptions:
 		form, cmd := m.optionsForm.Update(msg)
 		if f, ok := form.(*huh.Form); ok {
 			m.optionsForm = f
 		}
-
 		if m.optionsForm.State == huh.StateCompleted {
-			m.applyAdd()
-			m.applyOptions(m.optionsTarget)
-			m.state = stateList
-			m.refreshList()
+			m.applyWsOptions(m.wsOptionsTarget)
+			m.state = stateWorkspaceList
+			m.refreshWorkspaceList()
 			return m, nil
 		}
 		if m.optionsForm.State == huh.StateAborted {
-			m.state = stateList
+			m.state = stateWorkspaceList
 			return m, nil
 		}
 		return m, cmd
 
-	case stateOptions:
-		form, cmd := m.optionsForm.Update(msg)
-		if f, ok := form.(*huh.Form); ok {
-			m.optionsForm = f
-		}
-
-		if m.optionsForm.State == huh.StateCompleted {
-			m.applyOptions(m.optionsTarget)
-			m.state = stateList
-			m.refreshList()
-			return m, nil
-		}
-		if m.optionsForm.State == huh.StateAborted {
-			m.state = stateList
-			return m, nil
-		}
-		return m, cmd
-
-	case stateDeleting:
+	case stateWorkspaceDeleting:
 		form, cmd := m.deleteForm.Update(msg)
 		if f, ok := form.(*huh.Form); ok {
 			m.deleteForm = f
 		}
-
 		if m.deleteForm.State == huh.StateCompleted {
 			if m.deleteData.Confirm {
-				m.cfg.Remove(m.deleteTarget)
+				m.cfg.RemoveWorkspace(m.deleteTarget)
 				config.Save(m.cfg)
 			}
-			m.state = stateList
-			m.refreshList()
+			m.state = stateWorkspaceList
+			m.refreshWorkspaceList()
 			return m, nil
 		}
 		if m.deleteForm.State == huh.StateAborted {
-			m.state = stateList
+			m.state = stateWorkspaceList
+			return m, nil
+		}
+		return m, cmd
+
+	case stateProjectList:
+		return updateProjectList(m, msg)
+
+	case stateProjectAdding:
+		form, cmd := m.projAddForm.Update(msg)
+		if f, ok := form.(*huh.Form); ok {
+			m.projAddForm = f
+		}
+		if m.projAddForm.State == huh.StateCompleted {
+			m.applyProjAdd()
+			m.state = stateProjectList
+			m.refreshProjectList()
+			return m, nil
+		}
+		if m.projAddForm.State == huh.StateAborted {
+			m.state = stateProjectList
+			m.refreshProjectList()
+			return m, nil
+		}
+		return m, cmd
+
+	case stateProjectOptions:
+		form, cmd := m.optionsForm.Update(msg)
+		if f, ok := form.(*huh.Form); ok {
+			m.optionsForm = f
+		}
+		if m.optionsForm.State == huh.StateCompleted {
+			m.applyProjOptions()
+			m.state = stateProjectList
+			m.refreshProjectList()
+			return m, nil
+		}
+		if m.optionsForm.State == huh.StateAborted {
+			m.state = stateProjectList
+			m.refreshProjectList()
 			return m, nil
 		}
 		return m, cmd
@@ -238,18 +285,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if f, ok := form.(*huh.Form); ok {
 			m.generalOptionsForm = f
 		}
-
 		if m.generalOptionsForm.State == huh.StateCompleted {
 			m.cfg.ShortAlias = m.generalOptionsData.ShortAlias
 			m.cfg.ApplyMarker = m.generalOptionsData.ApplyMarker
 			m.cfg.AutoMode = m.generalOptionsData.AutoMode
 			config.Save(m.cfg)
-			m.state = stateList
-			m.refreshList()
+			m.state = stateWorkspaceList
+			m.refreshWorkspaceList()
 			return m, nil
 		}
 		if m.generalOptionsForm.State == huh.StateAborted {
-			m.state = stateList
+			m.state = stateWorkspaceList
 			return m, nil
 		}
 		return m, cmd
@@ -262,17 +308,21 @@ func (m *Model) View() string {
 	var content string
 
 	switch m.state {
-	case stateList:
+	case stateWorkspaceList:
 		header := logoStyle.Render(logo) + "  " + versionStyle.Render(m.version) + "\n\n"
 		content = header + m.list.View()
-	case stateAdding:
-		content = titleStyle.Render("Add Workspace") + "\n\n" + m.addForm.View()
-	case stateAddOptions:
-		content = titleStyle.Render("Workspace Options") + "\n\n" + m.optionsForm.View() + "\n" + hintStyle.Render("enter to save · esc to cancel")
-	case stateOptions:
-		content = titleStyle.Render("Options: "+m.optionsTarget) + "\n\n" + m.optionsForm.View() + "\n" + hintStyle.Render("enter to save · esc to cancel")
-	case stateDeleting:
+	case stateWorkspaceAdding:
+		content = titleStyle.Render("Add Workspace") + "\n\n" + m.wsAddForm.View()
+	case stateWorkspaceOptions:
+		content = titleStyle.Render("Options: "+m.wsOptionsTarget) + "\n\n" + m.optionsForm.View() + "\n" + hintStyle.Render("enter to save · esc to cancel")
+	case stateWorkspaceDeleting:
 		content = m.deleteForm.View()
+	case stateProjectList:
+		content = m.projectList.View()
+	case stateProjectAdding:
+		content = titleStyle.Render("Add Project to "+m.projectsTarget) + "\n\n" + m.projAddForm.View()
+	case stateProjectOptions:
+		content = titleStyle.Render("Project Options: "+filepath.Base(m.projOptionsTarget)) + "\n\n" + m.optionsForm.View() + "\n" + hintStyle.Render("enter to save · esc to cancel")
 	case stateSessions:
 		status := ""
 		if m.sessionsStatus != "" {
@@ -290,52 +340,29 @@ func (m *Model) View() string {
 	))
 }
 
-func (m *Model) resolveAddName() string {
-	name := m.addData.Name
-	if name == "" {
-		path := expandPath(m.addData.FolderPath)
-		abs, err := filepath.Abs(path)
-		if err != nil {
-			return ""
-		}
-		name = filepath.Base(abs)
-	}
-	return name
-}
+// --- Apply helpers ---
 
-func (m *Model) applyAdd() {
-	path := expandPath(m.addData.FolderPath)
-	abs, err := filepath.Abs(path)
-	if err != nil {
+func (m *Model) applyWsAdd() {
+	name := m.wsAddData.Name
+	if err := m.cfg.AddWorkspace(name); err != nil {
 		return
 	}
-
-	name := m.addData.Name
-	if name == "" {
-		name = filepath.Base(abs)
-	}
-
-	if err := m.cfg.Add(name, abs); err != nil {
-		return
-	}
-
-	if m.addData.APIKey != "" {
+	if m.wsAddData.APIKey != "" {
 		for i := range m.cfg.Workspaces {
 			if m.cfg.Workspaces[i].Name == name {
-				m.cfg.Workspaces[i].APIKey = m.addData.APIKey
+				m.cfg.Workspaces[i].APIKey = m.wsAddData.APIKey
 				break
 			}
 		}
 	}
-
 	config.Save(m.cfg)
 }
 
-func (m *Model) applyOptions(name string) {
-	// Update worktree setting in config
+func (m *Model) applyWsOptions(name string) {
+	// Update worktree setting
 	for i := range m.cfg.Workspaces {
 		if m.cfg.Workspaces[i].Name == name {
-			m.cfg.Workspaces[i].Worktree = m.optionsData.AlwaysWorktree
+			m.cfg.Workspaces[i].Worktree = m.optionsData.Worktree == "enabled"
 			break
 		}
 	}
@@ -346,7 +373,7 @@ func (m *Model) applyOptions(name string) {
 	if settings == nil {
 		settings = map[string]any{}
 	}
-	if m.optionsData.DisableAttribution {
+	if m.optionsData.DisableAttribution == "enabled" {
 		settings["attribution"] = map[string]string{
 			"commit": "",
 			"pr":     "",
@@ -357,30 +384,61 @@ func (m *Model) applyOptions(name string) {
 	config.WriteSessionSettings(name, settings)
 }
 
-func (m *Model) updateLoadingItem() {
-	items := m.list.Items()
-	for i, item := range items {
-		if ws, ok := item.(workspaceItem); ok {
-			if ws.name == m.loadingWorkspace {
-				ws.loading = m.spinner.View()
-			} else {
-				ws.loading = ""
+func (m *Model) applyProjAdd() {
+	path := expandPath(m.projAddData.FolderPath)
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return
+	}
+	if err := m.cfg.AddProject(abs, m.projectsTarget); err != nil {
+		return
+	}
+	config.Save(m.cfg)
+}
+
+func (m *Model) applyProjOptions() {
+	for i := range m.cfg.Projects {
+		if m.cfg.Projects[i].Path == m.projOptionsTarget {
+			switch m.optionsData.Worktree {
+			case "inherit":
+				m.cfg.Projects[i].Overrides.Worktree = nil
+			case "enabled":
+				v := true
+				m.cfg.Projects[i].Overrides.Worktree = &v
+			case "disabled":
+				v := false
+				m.cfg.Projects[i].Overrides.Worktree = &v
 			}
-			items[i] = ws
+			break
+		}
+	}
+	config.Save(m.cfg)
+}
+
+// --- Refresh helpers ---
+
+func (m *Model) refreshWorkspaceList() {
+	items := make([]list.Item, len(m.cfg.Workspaces))
+	for i, ws := range m.cfg.Workspaces {
+		items[i] = workspaceItem{
+			name:         ws.Name,
+			authInfo:     config.GetAuthInfo(ws.Name),
+			isDefault:    ws.Name == m.cfg.DefaultWorkspace,
+			projectCount: len(m.cfg.ProjectsForWorkspace(ws.Name)),
 		}
 	}
 	m.list.SetItems(items)
 }
 
-func (m *Model) refreshList() {
-	items := make([]list.Item, len(m.cfg.Workspaces))
-	for i, ws := range m.cfg.Workspaces {
-		items[i] = workspaceItem{
-			name:      ws.Name,
-			path:      ws.Path,
-			authInfo:  config.GetAuthInfo(ws.Name),
-			isDefault: ws.Name == m.cfg.DefaultWorkspace,
+func (m *Model) refreshProjectList() {
+	projects := m.cfg.ProjectsForWorkspace(m.projectsTarget)
+	items := make([]list.Item, len(projects))
+	for i, p := range projects {
+		items[i] = projectItem{
+			path:      p.Path,
+			workspace: p.Workspace,
+			overrides: p.Overrides,
 		}
 	}
-	m.list.SetItems(items)
+	m.projectList.SetItems(items)
 }

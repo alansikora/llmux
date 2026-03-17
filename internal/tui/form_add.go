@@ -8,12 +8,6 @@ import (
 	"github.com/charmbracelet/huh"
 )
 
-type addFormData struct {
-	FolderPath string
-	Name       string
-	APIKey     string
-}
-
 func expandPath(p string) string {
 	if strings.HasPrefix(p, "~/") {
 		home, _ := os.UserHomeDir()
@@ -22,7 +16,40 @@ func expandPath(p string) string {
 	return p
 }
 
-func newAddForm(data *addFormData) *huh.Form {
+// Workspace add form: name + optional API key (no path)
+type wsAddFormData struct {
+	Name   string
+	APIKey string
+}
+
+func newWsAddForm(data *wsAddFormData) *huh.Form {
+	return huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Workspace name").
+				Placeholder("my-workspace").
+				Value(&data.Name).
+				Validate(func(s string) error {
+					if strings.TrimSpace(s) == "" {
+						return os.ErrInvalid
+					}
+					return nil
+				}),
+			huh.NewInput().
+				Title("Anthropic API key").
+				Placeholder("(optional, uses existing env if empty)").
+				EchoMode(huh.EchoModePassword).
+				Value(&data.APIKey),
+		),
+	).WithKeyMap(formKeyMap())
+}
+
+// Project add form: path only (workspace is implicit from context)
+type projAddFormData struct {
+	FolderPath string
+}
+
+func newProjAddForm(data *projAddFormData) *huh.Form {
 	return huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
@@ -44,15 +71,6 @@ func newAddForm(data *addFormData) *huh.Form {
 					}
 					return nil
 				}),
-			huh.NewInput().
-				Title("Workspace name").
-				Placeholder("(defaults to folder name)").
-				Value(&data.Name),
-			huh.NewInput().
-				Title("Anthropic API key").
-				Placeholder("(optional, uses existing env if empty)").
-				EchoMode(huh.EchoModePassword).
-				Value(&data.APIKey),
 		),
 	).WithKeyMap(formKeyMap())
 }

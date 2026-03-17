@@ -9,7 +9,7 @@ import (
 
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List all workspaces",
+	Short: "List all workspaces and projects",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {
@@ -26,7 +26,16 @@ var listCmd = &cobra.Command{
 			if config.IsAuthenticated(ws.Name) {
 				auth = "●"
 			}
-			fmt.Printf("%s %s\t%s\n", auth, ws.Name, ws.Path)
+			def := ""
+			if ws.Name == cfg.DefaultWorkspace {
+				def = " ★"
+			}
+			fmt.Printf("%s %s%s\n", auth, ws.Name, def)
+
+			projects := cfg.ProjectsForWorkspace(ws.Name)
+			for _, p := range projects {
+				fmt.Printf("    %s\n", p.Path)
+			}
 		}
 		return nil
 	},

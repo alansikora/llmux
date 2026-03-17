@@ -19,16 +19,16 @@ var unapplyCmd = &cobra.Command{
 			return err
 		}
 
-		ws, err := resolveWorkspace(cfg, nil)
+		_, _, err = resolveWorkspace(cfg, nil)
 		if err != nil {
 			return err
 		}
 
-		sessionsPath := ws.Path
 		cwd, err := os.Getwd()
-		if err == nil {
-			sessionsPath = worktree.ResolveSessionsPath(cwd)
+		if err != nil {
+			return err
 		}
+		sessionsPath := worktree.ResolveSessionsPath(cwd)
 
 		if err := worktree.Unapply(sessionsPath); err != nil {
 			return err
