@@ -141,6 +141,7 @@ func updateList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.generalOptionsData = generalOptionsFormData{
 				ShortAlias:  m.cfg.ShortAlias,
 				ApplyMarker: m.cfg.ApplyMarker,
+				AutoMode:    m.cfg.AutoMode,
 			}
 			m.generalOptionsForm = newGeneralOptionsForm(&m.generalOptionsData, m.generalOptionsData)
 			m.state = stateGeneralOptions

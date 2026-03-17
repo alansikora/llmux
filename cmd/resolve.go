@@ -61,6 +61,10 @@ var resolveCmd = &cobra.Command{
 				fmt.Fprint(os.Stderr, "\033[90m↳ worktree mode skipped: not a git repository.\033[0m\n")
 			}
 		}
+		if result.AutoMode {
+			fmt.Fprint(os.Stderr, "\033[90m↳ auto mode enabled\033[0m\n")
+			fmt.Print("\n--enable-auto-mode")
+		}
 		return nil
 	},
 }
