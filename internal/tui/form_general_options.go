@@ -5,6 +5,7 @@ import "github.com/charmbracelet/huh"
 type generalOptionsFormData struct {
 	ShortAlias  bool
 	ApplyMarker bool
+	AutoMode    bool
 }
 
 func newGeneralOptionsForm(data *generalOptionsFormData, orig generalOptionsFormData) *huh.Form {
@@ -26,6 +27,14 @@ func newGeneralOptionsForm(data *generalOptionsFormData, orig generalOptionsForm
 				Affirmative("Enabled").
 				Negative("Disabled").
 				Value(&data.ApplyMarker),
+			confirmLeft().
+				TitleFunc(func() string {
+					return dirtyTitle("Enable auto mode?", data.AutoMode != orig.AutoMode)
+				}, &data.AutoMode).
+				Description("Pass --enable-auto-mode to Claude Code, allowing it to run without confirmation prompts.").
+				Affirmative("Enabled").
+				Negative("Disabled").
+				Value(&data.AutoMode),
 		),
 	).WithKeyMap(formKeyMap())
 }

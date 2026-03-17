@@ -36,6 +36,7 @@ func snippet(bin string) string {
   config_dir="$(echo "$resolve_output" | head -n1)"
   api_key="$(echo "$resolve_output" | sed -n '2p')"
   worktree_flag="$(echo "$resolve_output" | sed -n '3p')"
+  auto_mode_flag="$(echo "$resolve_output" | sed -n '4p')"
   local args=("$@")
   if [ "$worktree_flag" = "--worktree" ]; then
     local skip_worktree=false filtered=()
@@ -59,6 +60,9 @@ func snippet(bin string) string {
     else
       args=("${filtered[@]}")
     fi
+  fi
+  if [ "$auto_mode_flag" = "--enable-auto-mode" ]; then
+    args=("$auto_mode_flag" "${args[@]}")
   fi
   if [ -n "$api_key" ]; then
     ANTHROPIC_API_KEY="$api_key" CLAUDE_CONFIG_DIR="$config_dir" command claude "${args[@]}"
@@ -85,6 +89,10 @@ func fishSnippet(bin string) string {
   if test (count $resolve_output) -ge 3
     set worktree_flag $resolve_output[3]
   end
+  set -l auto_mode_flag ""
+  if test (count $resolve_output) -ge 4
+    set auto_mode_flag $resolve_output[4]
+  end
   set -l args $argv
   if test "$worktree_flag" = "--worktree"
     set -l filtered
@@ -108,6 +116,9 @@ func fishSnippet(bin string) string {
     else
       set args $filtered
     end
+  end
+  if test "$auto_mode_flag" = "--enable-auto-mode"
+    set args $auto_mode_flag $args
   end
   if test -n "$api_key"
     ANTHROPIC_API_KEY=$api_key CLAUDE_CONFIG_DIR=$config_dir command claude $args

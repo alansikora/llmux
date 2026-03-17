@@ -18,12 +18,14 @@ type Config struct {
 	DefaultWorkspace string      `json:"default_workspace,omitempty"`
 	ShortAlias       bool        `json:"short_alias,omitempty"`
 	ApplyMarker      bool        `json:"apply_marker,omitempty"`
+	AutoMode         bool        `json:"auto_mode,omitempty"`
 }
 
 type ResolveResult struct {
 	SessionDir    string
 	APIKey        string
 	Worktree      bool
+	AutoMode      bool
 	WorkspaceName string
 }
 
@@ -84,6 +86,7 @@ func (c *Config) Resolve(dir string) (ResolveResult, error) {
 						SessionDir:    SessionDir(c.Workspaces[i].Name),
 						APIKey:        c.Workspaces[i].APIKey,
 						Worktree:      c.Workspaces[i].Worktree,
+						AutoMode:      c.AutoMode,
 						WorkspaceName: c.Workspaces[i].Name,
 					}, nil
 				}
@@ -96,6 +99,7 @@ func (c *Config) Resolve(dir string) (ResolveResult, error) {
 		SessionDir:    SessionDir(best.Name),
 		APIKey:        best.APIKey,
 		Worktree:      best.Worktree,
+		AutoMode:      c.AutoMode,
 		WorkspaceName: best.Name,
 	}, nil
 }
