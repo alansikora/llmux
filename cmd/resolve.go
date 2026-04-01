@@ -8,6 +8,7 @@ import (
 
 	"github.com/allskar/llmux/internal/commands"
 	"github.com/allskar/llmux/internal/config"
+	"github.com/allskar/llmux/internal/update"
 	"github.com/spf13/cobra"
 )
 
@@ -49,7 +50,16 @@ var resolveCmd = &cobra.Command{
 
 		commands.Ensure()
 
-		fmt.Fprint(os.Stderr, "\033[90m↳ llmux "+DisplayVersion()+"\033[0m\n")
+		versionLine := "\033[90m↳ llmux " + DisplayVersion()
+		if latest := update.CheckUpdateNoticeCached(DisplayVersion()); latest != "" {
+			versionLine += " \033[33m(" + latest + " available — run llmux upgrade)\033[90m"
+		}
+		versionLine += "\033[0m\n"
+		fmt.Fprint(os.Stderr, versionLine)
+
+		// Refresh the cache in the background (non-blocking) so the next
+		// invocation has fresh data without stalling this one.
+		go update.CheckLatest()
 		if result.ProjectPath != "" {
 			projectName := filepath.Base(result.ProjectPath)
 			fmt.Fprintf(os.Stderr, "\033[90m↳ workspace: %s · project: %s\033[0m\n", result.WorkspaceName, projectName)
@@ -62,17 +72,22 @@ var resolveCmd = &cobra.Command{
 		} else {
 			fmt.Print("\n")
 		}
-		if result.Worktree {
-			if isGitRepo(args[0]) {
-				fmt.Fprint(os.Stderr, "\033[90m↳ worktree mode enabled. Use --no-worktree to open claude normally.\033[0m\n")
-				fmt.Print("\n--worktree")
-			} else {
+		// Line 3: worktree flag (always print to keep line-based protocol stable)
+		if result.Worktree && isGitRepo(args[0]) {
+			fmt.Fprint(os.Stderr, "\033[90m↳ worktree mode enabled. Use --no-worktree to open claude normally.\033[0m\n")
+			fmt.Print("\n--worktree")
+		} else {
+			if result.Worktree {
 				fmt.Fprint(os.Stderr, "\033[90m↳ worktree mode skipped: not a git repository.\033[0m\n")
 			}
+			fmt.Print("\n")
 		}
+		// Line 4: auto mode flag (always print to keep line-based protocol stable)
 		if result.AutoMode {
 			fmt.Fprint(os.Stderr, "\033[90m↳ auto mode enabled\033[0m\n")
 			fmt.Print("\n--enable-auto-mode")
+		} else {
+			fmt.Print("\n")
 		}
 		return nil
 	},

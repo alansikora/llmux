@@ -26,10 +26,17 @@ const (
 	stateGeneralOptions         // Global config options
 )
 
+// updateCheckMsg is sent when the async update check completes.
+type updateCheckMsg struct {
+	latestVersion string
+}
+
 type Model struct {
-	cfg     *config.Config
-	version string
-	state   state
+	cfg           *config.Config
+	version       string
+	latestVersion string       // set if a newer version is available
+	updateCh      <-chan string // receives result from async update check
+	state         state
 
 	list   list.Model // workspace list (main view)
 	width  int
@@ -74,22 +81,35 @@ type Model struct {
 	generalOptionsData generalOptionsFormData
 }
 
-func NewModel(cfg *config.Config, version string) *Model {
+func NewModel(cfg *config.Config, version string, updateCh <-chan string) *Model {
 	return &Model{
-		cfg:     cfg,
-		version: version,
-		state:   stateWorkspaceList,
+		cfg:      cfg,
+		version:  version,
+		updateCh: updateCh,
+		state:    stateWorkspaceList,
 	}
 }
 
 func (m *Model) Init() tea.Cmd {
 	m.list = buildWorkspaceList(m.cfg, m.version, 80, 20)
 	m.spinner = spinner.New(spinner.WithSpinner(spinner.Dot))
+	if m.updateCh != nil {
+		return waitForUpdateCheck(m.updateCh)
+	}
 	return nil
+}
+
+func waitForUpdateCheck(ch <-chan string) tea.Cmd {
+	return func() tea.Msg {
+		return updateCheckMsg{latestVersion: <-ch}
+	}
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case updateCheckMsg:
+		m.latestVersion = msg.latestVersion
+		return m, nil
 	case spinner.TickMsg:
 		if m.sessionsLoading {
 			var cmd tea.Cmd
@@ -101,7 +121,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sessionsLoading = false
 		m.loadingProject = ""
 		h, v := appStyle.GetFrameSize()
-		m.sessionsList = buildSessionsList(msg.sessions, msg.applied, m.width-h, m.height-v-7)
+		m.sessionsList = buildSessionsList(msg.sessions, msg.applied, m.width-h, m.height-v-headerHeight)
 		m.sessionsStatus = ""
 		if msg.wsPath != "" {
 			m.sessionsPath = msg.wsPath
@@ -161,7 +181,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.sessionsLoading = false
 				projects := m.cfg.ProjectsForWorkspace(m.projectsTarget)
 				h, v := appStyle.GetFrameSize()
-				m.projectList = buildProjectList(projects, m.projectsTarget, m.width-h, m.height-v-7)
+				m.projectList = buildProjectList(projects, m.projectsTarget, m.width-h, m.height-v-headerHeight)
 				m.state = stateProjectList
 				return m, nil
 			default:
@@ -309,7 +329,11 @@ func (m *Model) View() string {
 
 	switch m.state {
 	case stateWorkspaceList:
-		header := logoStyle.Render(logo) + "  " + versionStyle.Render(m.version) + "\n\n"
+		headerParts := logoStyle.Render(logo) + "  " + versionStyle.Render(m.version)
+		if m.latestVersion != "" {
+			headerParts += "  " + updateStyle.Render(m.latestVersion+" available — run llmux upgrade")
+		}
+		header := headerParts + "\n\n"
 		content = header + m.list.View()
 	case stateWorkspaceAdding:
 		content = titleStyle.Render("Add Workspace") + "\n\n" + m.wsAddForm.View()
