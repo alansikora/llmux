@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -86,6 +87,9 @@ const logo = ` _ _
 | | | | | | | | |_| |>  <
 |_|_|_| |_| |_|\__,_/_/\_\`
 
+// headerHeight is the number of lines the logo occupies, plus 1 for the version line and 1 for padding.
+var headerHeight = strings.Count(logo, "\n") + 3
+
 func buildWorkspaceList(cfg *config.Config, version string, width, height int) list.Model {
 	items := make([]list.Item, len(cfg.Workspaces))
 	for i, ws := range cfg.Workspaces {
@@ -163,7 +167,7 @@ func updateWorkspaceList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.projectsTarget = item.name
 				projects := m.cfg.ProjectsForWorkspace(item.name)
 				h, v := appStyle.GetFrameSize()
-				m.projectList = buildProjectList(projects, item.name, m.width-h, m.height-v-7)
+				m.projectList = buildProjectList(projects, item.name, m.width-h, m.height-v-headerHeight)
 				m.state = stateProjectList
 				return m, nil
 			}

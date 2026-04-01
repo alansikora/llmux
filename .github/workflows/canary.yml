@@ -4,6 +4,7 @@ permissions:
   contents: write
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -23,6 +24,7 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version: stable
+          cache: true
 
       - uses: goreleaser/goreleaser-action@v7
         with:
@@ -31,13 +33,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish canary release
+      - name: Publish canary
         run: |
-          gh release delete canary --yes --cleanup-tag 2>/dev/null || true
+          COMMIT_SHA="$(git rev-parse HEAD)"
+          git tag -f canary
+          git push -f origin canary
+
+          gh release delete canary --yes 2>/dev/null || true
           gh release create canary dist/*.tar.gz dist/checksums.txt \
             --title "Canary ($(git rev-parse --short HEAD))" \
             --notes "Latest build from \`main\` — commit $(git rev-parse --short HEAD). Not a stable release." \
             --prerelease \
-            --target main
+            --target "$COMMIT_SHA"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
