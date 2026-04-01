@@ -186,7 +186,7 @@ If the directory isn't registered to any workspace, the wrapper triggers `llmux 
 
 If the resolved project has **Always use worktree** enabled, the wrapper also runs `git fetch origin <default-branch>` before launching Claude — so the worktree is always based on an up-to-date branch. The fetch is a best-effort no-op if there's no remote, no network, or `origin/HEAD` isn't set. Pass `--no-worktree` (or `-nw`) to skip both the fetch and the worktree for a single session.
 
-Workspaces and sessions are stored in `~/.config/llmux/`:
+Workspaces and sessions are stored in `~/.config/llmux/` (overridable via `LLMUX_CONFIG_DIR`):
 
 ```
 ~/.config/llmux/
