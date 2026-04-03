@@ -1,57 +1,46 @@
 version: 1
-
 context: |
   Go CLI tool (workspace manager for Claude Code) using Cobra for CLI commands,
   Bubbletea/Huh/Lipgloss for terminal UI, and JSON file-based configuration.
   All logic must live in Go; shell wrappers (bash/zsh/fish) must be minimal.
   No automated tests exist yet. Config is stored in ~/.config/llmux/ as JSON.
-
 rules:
   - id: minimize-shell-logic
     description: "Shell wrapper code (install.sh, generated shell functions) must be kept minimal — all logic belongs in Go"
     severity: warning
     paths: ["install.sh", "internal/shell/**"]
-
   - id: error-handling-required
     description: "Go functions returning errors must have their errors checked; do not silently discard errors except where explicitly justified"
     severity: bug
     paths: ["**/*.go"]
-
   - id: path-traversal-safety
     description: "User-supplied paths used in file operations must be validated to prevent path traversal attacks (e.g. via filepath.Clean and prefix checks)"
     severity: critical
     paths: ["internal/config/**/*.go", "cmd/**/*.go"]
-
   - id: no-hardcoded-home-paths
     description: "Use os.UserHomeDir() and ConfigDir() helpers instead of hardcoding ~ or /home paths; respect LLMUX_CONFIG_DIR override"
     severity: warning
     paths: ["**/*.go"]
-
   - id: safe-file-permissions
     description: "Files containing API keys or credentials must be written with restrictive permissions (0600); directories with 0700 or 0755"
     severity: critical
     paths: ["internal/config/**/*.go"]
-
   - id: json-config-backward-compat
     description: "Changes to Config/Workspace/Project structs must maintain backward compatibility with existing JSON config files or include migration logic"
     severity: bug
     paths: ["internal/config/**/*.go"]
-
   - id: tui-state-transitions
     description: "TUI state machine transitions must handle all reachable states; avoid invalid state combinations that could panic or freeze the UI"
     severity: bug
     paths: ["internal/tui/**/*.go"]
-
   - id: cobra-command-structure
     description: "Cobra commands must set Short/Long descriptions and use RunE (not Run) to propagate errors to the caller"
     severity: suggestion
     paths: ["cmd/**/*.go"]
-
   - id: no-os-exit-in-library
     description: "Do not call os.Exit() or log.Fatal() outside of main.go; return errors instead so callers can handle them"
     severity: warning
     paths: ["internal/**/*.go", "cmd/**/*.go"]
-
 ignore:
   - "go.sum"
   - "*.lock"
@@ -59,3 +48,6 @@ ignore:
   - ".goreleaser.yml"
   - "vendor/**"
   - ".github/**"
+provider: anthropic
+review_model: claude-sonnet-4-6
+triage_model: claude-haiku-4-5-20251001

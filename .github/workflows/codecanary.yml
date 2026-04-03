@@ -1,3 +1,5 @@
+# Source of truth: internal/setup/codecanary.yml (must be identical).
+# Run `go test ./internal/setup/` to verify sync.
 name: CodeCanary
 on:
   pull_request_target:
@@ -46,10 +48,26 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - uses: alansikora/codecanary-action@canary
+      # Prevent fork PRs from poisoning config to redirect secrets to an
+      # attacker-controlled endpoint (pull_request_target + checkout attack).
+      - name: Pin config to base branch
+        if: >-
+          env.skip != 'true' &&
+          github.event.pull_request.base.sha != '' &&
+          github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          git fetch --depth=1 origin "$BASE"
+          for f in .codecanary/config.yml .codecanary/review.yml .codecanary.yml; do
+            if git show "$BASE":"$f" > /tmp/base-cfg 2>/dev/null; then
+              cp /tmp/base-cfg "$f"
+            fi
+          done
+
+      - uses: alansikora/codecanary@v1
         if: env.skip != 'true'
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          provider_secret: ${{ secrets.CODECANARY_PROVIDER_SECRET }}
           config_path: .codecanary/config.yml
           reply_only: ${{ github.event_name == 'pull_request_review_comment' }}
 
