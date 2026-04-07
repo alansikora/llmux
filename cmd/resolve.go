@@ -43,7 +43,18 @@ func subcmdCachePath() string {
 	return filepath.Join(config.ConfigDir(), subcmdCacheFile)
 }
 
+// readSubcmdCache returns the cached subcommand set if fresh (within TTL).
 func readSubcmdCache() map[string]bool {
+	return readSubcmdCacheWithTTL(24 * time.Hour)
+}
+
+// readSubcmdCacheStale returns the cached subcommand set regardless of age,
+// used as a fallback when the live fetch fails.
+func readSubcmdCacheStale() map[string]bool {
+	return readSubcmdCacheWithTTL(0)
+}
+
+func readSubcmdCacheWithTTL(ttl time.Duration) map[string]bool {
 	data, err := os.ReadFile(subcmdCachePath())
 	if err != nil {
 		return nil
@@ -52,7 +63,7 @@ func readSubcmdCache() map[string]bool {
 	if err := json.Unmarshal(data, &c); err != nil {
 		return nil
 	}
-	if time.Since(c.CachedAt) > 24*time.Hour {
+	if ttl > 0 && time.Since(c.CachedAt) > ttl {
 		return nil
 	}
 	m := make(map[string]bool, len(c.Subcommands))
@@ -68,8 +79,11 @@ func writeSubcmdCache(subcmds map[string]bool) {
 		list = append(list, s)
 	}
 	data, _ := json.Marshal(subcmdCache{Subcommands: list, CachedAt: time.Now()})
-	os.MkdirAll(filepath.Dir(subcmdCachePath()), 0755)
-	os.WriteFile(subcmdCachePath(), data, 0644)
+	p := subcmdCachePath()
+	if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+		return
+	}
+	os.WriteFile(p, data, 0644)
 }
 
 // parseClaudeSubcommands parses the Commands section from `claude --help` output.
@@ -116,7 +130,7 @@ func getClaudeSubcommands() map[string]bool {
 
 	out, err := exec.CommandContext(ctx, "claude", "--help").CombinedOutput()
 	if err != nil {
-		return nil
+		return readSubcmdCacheStale()
 	}
 
 	subcmds := parseClaudeSubcommands(string(out))
