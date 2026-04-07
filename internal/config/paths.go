@@ -153,7 +153,10 @@ func newStatusLineConfig() map[string]any {
 func SyncWorkspaceSettings(cfg *Config, wsName string) error {
 	existing, _ := os.ReadFile(filepath.Join(SessionDir(wsName), "settings.json"))
 
-	settings := ReadSessionSettings(wsName)
+	var settings map[string]any
+	if len(existing) > 0 {
+		json.Unmarshal(existing, &settings) //nolint:errcheck
+	}
 	if settings == nil {
 		settings = map[string]any{}
 	}
@@ -191,12 +194,17 @@ func SyncWorkspaceSettings(cfg *Config, wsName string) error {
 	}
 
 	// Skip write if nothing changed to avoid unnecessary I/O and write races.
+	// Normalize existing bytes through marshal to make comparison format-independent.
 	updated, err := json.MarshalIndent(settings, "", "  ")
 	if err != nil {
 		return err
 	}
-	if string(updated) == string(existing) {
-		return nil
+	var existingParsed map[string]any
+	if json.Unmarshal(existing, &existingParsed) == nil {
+		existingNorm, _ := json.MarshalIndent(existingParsed, "", "  ")
+		if string(updated) == string(existingNorm) {
+			return nil
+		}
 	}
 	return WriteSessionSettings(wsName, settings)
 }
