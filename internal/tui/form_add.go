@@ -44,6 +44,28 @@ func newWsAddForm(data *wsAddFormData) *huh.Form {
 	).WithKeyMap(formKeyMap())
 }
 
+// Workspace rename form: new name only
+type wsRenameFormData struct {
+	Name string
+}
+
+func newWsRenameForm(data *wsRenameFormData) *huh.Form {
+	return huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("New workspace name").
+				Placeholder("new-workspace-name").
+				Value(&data.Name).
+				Validate(func(s string) error {
+					if strings.TrimSpace(s) == "" {
+						return os.ErrInvalid
+					}
+					return nil
+				}),
+		),
+	).WithKeyMap(formKeyMap())
+}
+
 // Project add form: path only (workspace is implicit from context)
 type projAddFormData struct {
 	FolderPath string

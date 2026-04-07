@@ -63,6 +63,41 @@ func (c *Config) AddWorkspace(name string) error {
 	return nil
 }
 
+func (c *Config) RenameWorkspace(oldName, newName string) error {
+	newName = strings.TrimSpace(newName)
+	if newName == "" {
+		return fmt.Errorf("workspace name cannot be empty")
+	}
+	if oldName == newName {
+		return nil
+	}
+	for _, ws := range c.Workspaces {
+		if ws.Name == newName {
+			return fmt.Errorf("workspace %q already exists", newName)
+		}
+	}
+	found := false
+	for i := range c.Workspaces {
+		if c.Workspaces[i].Name == oldName {
+			c.Workspaces[i].Name = newName
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("workspace %q not found", oldName)
+	}
+	for i := range c.Projects {
+		if c.Projects[i].Workspace == oldName {
+			c.Projects[i].Workspace = newName
+		}
+	}
+	if c.DefaultWorkspace == oldName {
+		c.DefaultWorkspace = newName
+	}
+	return nil
+}
+
 func (c *Config) RemoveWorkspace(name string) error {
 	found := false
 	for i, ws := range c.Workspaces {
