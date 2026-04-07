@@ -274,6 +274,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.deleteData.Confirm {
 				m.cfg.RemoveWorkspace(m.deleteTarget)
 				config.Save(m.cfg)
+				config.RemoveSessionDir(m.deleteTarget)
 			}
 			m.state = stateWorkspaceList
 			m.refreshWorkspaceList()
@@ -430,7 +431,13 @@ func (m *Model) applyWsRename() {
 		m.statusMsg = fmt.Sprintf("rename session dir error: %v", err)
 		return
 	}
-	config.Save(m.cfg)
+	if err := config.Save(m.cfg); err != nil {
+		// Roll back: rename session dir back, revert in-memory config
+		_ = config.RenameSessionDir(newName, oldName)
+		_ = m.cfg.RenameWorkspace(newName, oldName)
+		m.statusMsg = fmt.Sprintf("save error: %v", err)
+		return
+	}
 	m.statusMsg = ""
 	if err := config.SyncWorkspaceSettings(m.cfg, newName); err != nil {
 		m.statusMsg = fmt.Sprintf("settings sync error: %v", err)

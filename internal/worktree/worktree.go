@@ -162,20 +162,24 @@ func Apply(workspacePath, sessionName string, applyMarker ...bool) error {
 	applied := false
 	defer func() {
 		if !applied && stashCreated {
-			runGit(workspacePath, "stash", "pop") //nolint:errcheck
+			if _, err := runGit(workspacePath, "stash", "pop"); err != nil {
+				fmt.Fprintf(os.Stderr, "llmux: warning: failed to restore stash — run 'git stash pop' manually: %v\n", err)
+			}
 		}
 	}()
 
 	// Snapshot the session's full working state (committed + staged + unstaged)
-	// git add -N marks untracked files so they appear in diffs
+	// git add -N marks untracked files so they appear in diffs.
+	// Always restore the index afterwards via git reset, even on error.
 	if _, err := runGit(session.Path, "add", "-N", "."); err != nil {
 		return fmt.Errorf("staging untracked files for snapshot: %w", err)
 	}
 	// git stash create returns a ref capturing everything, without side effects
 	stashOut, stashErr := runGit(session.Path, "stash", "create")
-	// Restore the session's original index state before checking stash error
-	if _, err := runGit(session.Path, "reset"); err != nil {
-		return fmt.Errorf("restoring session index: %w", err)
+	// Always restore the session's original index state to avoid leaving
+	// stale intent-to-add entries from git add -N.
+	if _, resetErr := runGit(session.Path, "reset"); resetErr != nil {
+		fmt.Fprintf(os.Stderr, "llmux: warning: failed to reset session index: %v\n", resetErr)
 	}
 
 	ref := strings.TrimSpace(stashOut)
@@ -200,6 +204,11 @@ func Apply(workspacePath, sessionName string, applyMarker ...bool) error {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("applying diff: %s\n%s", err, string(output))
+	}
+
+	// Save diff for reverse-apply during unapply
+	if err := SaveDiff(workspacePath, diff); err != nil {
+		return fmt.Errorf("saving diff: %w", err)
 	}
 
 	// Save state
@@ -232,20 +241,29 @@ func Unapply(workspacePath string) error {
 	// Remove marker file if present
 	removeMarker(workspacePath)
 
-	// Unstage any staged changes (git apply --3way stages files)
+	// Reverse-apply the saved diff to undo only the applied changes,
+	// preserving any edits the user made after applying.
+	diff, err := LoadDiff(workspacePath)
+	if err != nil {
+		// Fall back to destructive unapply if diff file is missing
+		// (e.g. applied with an older version that didn't save diffs)
+		return unapplyDestructive(workspacePath, state)
+	}
+
+	// Unstage any staged changes first
 	if _, err := runGit(workspacePath, "reset", "HEAD"); err != nil {
 		return fmt.Errorf("unstaging changes: %w", err)
 	}
 
-	// Discard applied changes
-	if _, err := runGit(workspacePath, "checkout", "."); err != nil {
-		return fmt.Errorf("reverting changes: %w", err)
+	cmd := exec.Command("git", "apply", "--reverse")
+	cmd.Dir = workspacePath
+	cmd.Stdin = strings.NewReader(diff)
+	output, applyErr := cmd.CombinedOutput()
+	if applyErr != nil {
+		return fmt.Errorf("reverse-apply failed (manual resolution needed): %s\n%s", applyErr, string(output))
 	}
 
-	// Clean any untracked files that were added by the apply
-	if _, err := runGit(workspacePath, "clean", "-fd"); err != nil {
-		return fmt.Errorf("cleaning untracked files: %w", err)
-	}
+	RemoveDiff(workspacePath)
 
 	// Pop stash if one was created
 	if state.StashCreated {
@@ -254,6 +272,25 @@ func Unapply(workspacePath string) error {
 		}
 	}
 
+	return RemoveState(workspacePath)
+}
+
+// unapplyDestructive is the legacy fallback when no saved diff is available.
+func unapplyDestructive(workspacePath string, state *ApplyState) error {
+	if _, err := runGit(workspacePath, "reset", "HEAD"); err != nil {
+		return fmt.Errorf("unstaging changes: %w", err)
+	}
+	if _, err := runGit(workspacePath, "checkout", "."); err != nil {
+		return fmt.Errorf("reverting changes: %w", err)
+	}
+	if _, err := runGit(workspacePath, "clean", "-fd"); err != nil {
+		return fmt.Errorf("cleaning untracked files: %w", err)
+	}
+	if state.StashCreated {
+		if _, err := runGit(workspacePath, "stash", "pop"); err != nil {
+			return fmt.Errorf("restoring stash: %w", err)
+		}
+	}
 	return RemoveState(workspacePath)
 }
 

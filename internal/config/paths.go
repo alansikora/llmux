@@ -76,7 +76,9 @@ func Load() (*Config, error) {
 					})
 				}
 			}
-			Save(&cfg)
+			if err := Save(&cfg); err != nil {
+				fmt.Fprintf(os.Stderr, "llmux: warning: failed to save migrated config (will retry on next launch): %v\n", err)
+			}
 		}
 	}
 
@@ -93,7 +95,24 @@ func Save(cfg *Config) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(ConfigFile(), data, 0644)
+
+	// Atomic write: write to temp file in same directory, then rename.
+	target := ConfigFile()
+	tmp, err := os.CreateTemp(dir, ".config-*.json")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		os.Remove(tmpPath)
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+	return os.Rename(tmpPath, target)
 }
 
 // RenameSessionDir renames the session directory from oldName to newName.
@@ -110,6 +129,16 @@ func RenameSessionDir(oldName, newName string) error {
 		return fmt.Errorf("checking session directory %q: %w", newDir, err)
 	}
 	return os.Rename(oldDir, newDir)
+}
+
+// RemoveSessionDir removes the session directory for a workspace.
+// It is a no-op if the directory does not exist.
+func RemoveSessionDir(name string) error {
+	dir := SessionDir(name)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return nil
+	}
+	return os.RemoveAll(dir)
 }
 
 // WriteSessionSettings writes a settings.json into the session directory.
