@@ -23,6 +23,7 @@ Claude Code stores everything in `~/.claude`. If you work across multiple projec
 - **Session resume** — resume a worktree session by name or branch with `llmux resume`
 - **Slash commands** — `/llmux apply` and `/llmux unapply` available inside Claude Code sessions
 - **Auto mode** — globally pass `--enable-auto-mode` to Claude Code
+- **Status line** — enable [ccstatusline](https://github.com/sirmalloc/ccstatusline) across all workspaces, showing model, context, and git info in Claude Code
 - **Disable attributions** — remove "Made with Claude Code" from commits and PRs per workspace
 - **Auto-update** — `llmux upgrade` checks GitHub releases and upgrades in place, with update notices in the TUI
 - **Short alias** — optionally define `c` as a shorthand for `claude`
@@ -164,6 +165,7 @@ Press `o` to configure global settings:
 - **Short alias** — defines `c` as a shorthand for `claude` (requires shell restart to take effect)
 - **Apply marker** — creates a `.llmux-applied` file in the workspace root when a session is applied (makes it visible in `git status`)
 - **Auto mode** — passes `--enable-auto-mode` to Claude Code, allowing it to run without confirmation prompts
+- **Status line** — enables [ccstatusline](https://github.com/sirmalloc/ccstatusline) across all workspaces. When enabled, the status line config is automatically added to every workspace's `settings.json` (including newly created workspaces). Disable to remove from all workspaces.
 
 ### CLI commands
 
