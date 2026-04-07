@@ -102,6 +102,9 @@ func RenameSessionDir(oldName, newName string) error {
 		return nil
 	}
 	newDir := SessionDir(newName)
+	if _, err := os.Stat(newDir); err == nil {
+		return fmt.Errorf("session directory %q already exists", newDir)
+	}
 	return os.Rename(oldDir, newDir)
 }
 

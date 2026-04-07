@@ -18,7 +18,6 @@ type state int
 const (
 	stateWorkspaceList    state = iota
 	stateWorkspaceAdding        // Add workspace (name + API key)
-	stateWorkspaceRenaming      // Rename workspace
 	stateWorkspaceOptions       // Edit workspace settings
 	stateWorkspaceDeleting      // Delete workspace confirmation
 	stateProjectList            // List projects for a workspace
@@ -26,6 +25,7 @@ const (
 	stateProjectOptions         // Edit project overrides
 	stateSessions               // Worktree sessions (per project)
 	stateGeneralOptions         // Global config options
+	stateWorkspaceRenaming      // Rename workspace
 )
 
 // updateCheckMsg is sent when the async update check completes.
@@ -436,6 +436,7 @@ func (m *Model) applyWsRename() {
 		return
 	}
 	if err := config.RenameSessionDir(oldName, newName); err != nil {
+		_ = m.cfg.RenameWorkspace(newName, oldName) // roll back in-memory mutation
 		m.statusMsg = fmt.Sprintf("rename session dir error: %v", err)
 		return
 	}

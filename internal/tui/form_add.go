@@ -54,6 +54,7 @@ func newWsRenameForm(data *wsRenameFormData) *huh.Form {
 		huh.NewGroup(
 			huh.NewInput().
 				Title("New workspace name").
+				Placeholder("new-workspace-name").
 				Value(&data.Name).
 				Validate(func(s string) error {
 					if strings.TrimSpace(s) == "" {

@@ -64,7 +64,8 @@ func (c *Config) AddWorkspace(name string) error {
 }
 
 func (c *Config) RenameWorkspace(oldName, newName string) error {
-	if strings.TrimSpace(newName) == "" {
+	newName = strings.TrimSpace(newName)
+	if newName == "" {
 		return fmt.Errorf("workspace name cannot be empty")
 	}
 	if oldName == newName {
