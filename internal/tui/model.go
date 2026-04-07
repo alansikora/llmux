@@ -460,19 +460,9 @@ func (m *Model) applyWsOptions(name string) {
 	config.Save(m.cfg)
 
 	// Update session settings (attribution)
-	settings := config.ReadSessionSettings(name)
-	if settings == nil {
-		settings = map[string]any{}
+	if err := config.SetAttribution(name, m.optionsData.DisableAttribution == "enabled"); err != nil {
+		m.statusMsg = fmt.Sprintf("attribution error: %v", err)
 	}
-	if m.optionsData.DisableAttribution == "enabled" {
-		settings["attribution"] = map[string]string{
-			"commit": "",
-			"pr":     "",
-		}
-	} else {
-		delete(settings, "attribution")
-	}
-	config.WriteSessionSettings(name, settings)
 }
 
 func (m *Model) applyProjAdd() {

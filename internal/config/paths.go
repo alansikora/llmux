@@ -20,8 +20,12 @@ func ConfigFile() string {
 	return filepath.Join(ConfigDir(), "config.json")
 }
 
+func SessionsDir() string {
+	return filepath.Join(ConfigDir(), "sessions")
+}
+
 func SessionDir(name string) string {
-	return filepath.Join(ConfigDir(), "sessions", name)
+	return filepath.Join(SessionsDir(), name)
 }
 
 func Load() (*Config, error) {
@@ -163,6 +167,34 @@ func SyncStatusLine(cfg *Config) error {
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// IsAttributionDisabled reports whether the attribution-suppression key
+// is present in a workspace's session settings.
+func IsAttributionDisabled(name string) bool {
+	settings := ReadSessionSettings(name)
+	if settings == nil {
+		return false
+	}
+	_, ok := settings["attribution"]
+	return ok
+}
+
+// SetAttribution enables or disables the attribution setting for a workspace.
+func SetAttribution(name string, disabled bool) error {
+	settings := ReadSessionSettings(name)
+	if settings == nil {
+		settings = map[string]any{}
+	}
+	if disabled {
+		settings["attribution"] = map[string]string{
+			"commit": "",
+			"pr":     "",
+		}
+	} else {
+		delete(settings, "attribution")
+	}
+	return WriteSessionSettings(name, settings)
 }
 
 // AuthInfo holds display information about a workspace's authentication.

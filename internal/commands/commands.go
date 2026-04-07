@@ -78,7 +78,7 @@ func Ensure() {
 // directories that don't already have one. It is idempotent and safe to call
 // on every resolve (i.e. every `claude` invocation).
 func EnsureSessionSymlinks(commandsDir string) {
-	sessionsDir := filepath.Join(config.ConfigDir(), "sessions")
+	sessionsDir := config.SessionsDir()
 	entries, err := os.ReadDir(sessionsDir)
 	if err != nil {
 		return

@@ -195,12 +195,9 @@ func updateWorkspaceList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "e":
 			if item, ok := m.list.SelectedItem().(workspaceItem); ok {
-				settings := config.ReadSessionSettings(item.name)
 				attrVal := "disabled"
-				if settings != nil {
-					if _, ok := settings["attribution"]; ok {
-						attrVal = "enabled"
-					}
+				if config.IsAttributionDisabled(item.name) {
+					attrVal = "enabled"
 				}
 				worktreeVal := "disabled"
 				for _, ws := range m.cfg.Workspaces {
@@ -290,12 +287,7 @@ func updateProjectList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 				defaults := &wsDefaults{}
 				if ws != nil {
 					defaults.Worktree = ws.Worktree
-					settings := config.ReadSessionSettings(ws.Name)
-					if settings != nil {
-						if _, ok := settings["attribution"]; ok {
-							defaults.DisableAttribution = true
-						}
-					}
+					defaults.DisableAttribution = config.IsAttributionDisabled(ws.Name)
 				}
 
 				worktreeVal := "inherit"
