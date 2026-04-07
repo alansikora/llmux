@@ -26,7 +26,7 @@ func rcFile(sh string) (string, error) {
 
 func snippet(bin string) string {
 	return fmt.Sprintf(`claude() {
-  local resolve_output config_dir api_key worktree_flag auto_mode_flag
+  local resolve_output config_dir extra_flags
   resolve_output="$(%s resolve "$(pwd -P)" -- "$@")"
   local resolve_status=$?
   if [ $resolve_status -eq 2 ]; then
@@ -38,9 +38,7 @@ func snippet(bin string) string {
     return 1
   fi
   config_dir="$(echo "$resolve_output" | head -n1)"
-  api_key="$(echo "$resolve_output" | sed -n '2p')"
-  worktree_flag="$(echo "$resolve_output" | sed -n '3p')"
-  auto_mode_flag="$(echo "$resolve_output" | sed -n '4p')"
+  extra_flags="$(echo "$resolve_output" | sed -n '2p')"
   local args=()
   for arg in "$@"; do
     if [ "$arg" = "--no-worktree" ] || [ "$arg" = "-nw" ]; then
@@ -48,7 +46,7 @@ func snippet(bin string) string {
     fi
     args+=("$arg")
   done
-  if [ "$worktree_flag" = "--worktree" ]; then
+  if [ "$extra_flags" = "--worktree" ]; then
     local default_branch
     default_branch="$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')"
     if [ -n "$default_branch" ]; then
@@ -56,14 +54,7 @@ func snippet(bin string) string {
     fi
     args=("--worktree" "${args[@]}")
   fi
-  if [ "$auto_mode_flag" = "--enable-auto-mode" ]; then
-    args=("$auto_mode_flag" "${args[@]}")
-  fi
-  if [ -n "$api_key" ]; then
-    ANTHROPIC_API_KEY="$api_key" CLAUDE_CONFIG_DIR="$config_dir" command claude "${args[@]}"
-  else
-    CLAUDE_CONFIG_DIR="$config_dir" command claude "${args[@]}"
-  fi
+  CLAUDE_CONFIG_DIR="$config_dir" command claude "${args[@]}"
 }`, bin, bin, bin)
 }
 
@@ -80,17 +71,9 @@ func fishSnippet(bin string) string {
     return 1
   end
   set -l config_dir $resolve_output[1]
-  set -l api_key ""
-  set -l worktree_flag ""
+  set -l extra_flags ""
   if test (count $resolve_output) -ge 2
-    set api_key $resolve_output[2]
-  end
-  if test (count $resolve_output) -ge 3
-    set worktree_flag $resolve_output[3]
-  end
-  set -l auto_mode_flag ""
-  if test (count $resolve_output) -ge 4
-    set auto_mode_flag $resolve_output[4]
+    set extra_flags $resolve_output[2]
   end
   set -l args
   for arg in $argv
@@ -99,21 +82,14 @@ func fishSnippet(bin string) string {
     end
     set -a args $arg
   end
-  if test "$worktree_flag" = "--worktree"
+  if test "$extra_flags" = "--worktree"
     set -l default_branch (git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
     if test -n "$default_branch"
       git fetch origin $default_branch 2>/dev/null
     end
     set args --worktree $args
   end
-  if test "$auto_mode_flag" = "--enable-auto-mode"
-    set args $auto_mode_flag $args
-  end
-  if test -n "$api_key"
-    ANTHROPIC_API_KEY=$api_key CLAUDE_CONFIG_DIR=$config_dir command claude $args
-  else
-    CLAUDE_CONFIG_DIR=$config_dir command claude $args
-  end
+  CLAUDE_CONFIG_DIR=$config_dir command claude $args
 end`, bin, bin, bin)
 }
 

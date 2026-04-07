@@ -338,8 +338,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cfg.AutoMode = m.generalOptionsData.AutoMode
 			m.cfg.StatusLine = m.generalOptionsData.StatusLine
 			config.Save(m.cfg)
-			if err := config.SyncStatusLine(m.cfg); err != nil {
-				m.statusMsg = fmt.Sprintf("statusline sync error: %v", err)
+			if err := config.SyncAllWorkspaceSettings(m.cfg); err != nil {
+				m.statusMsg = fmt.Sprintf("settings sync error: %v", err)
 			} else {
 				m.statusMsg = ""
 			}
@@ -409,22 +409,12 @@ func (m *Model) applyWsAdd() {
 	if err := m.cfg.AddWorkspace(name); err != nil {
 		return
 	}
-	if m.wsAddData.APIKey != "" {
-		for i := range m.cfg.Workspaces {
-			if m.cfg.Workspaces[i].Name == name {
-				m.cfg.Workspaces[i].APIKey = m.wsAddData.APIKey
-				break
-			}
-		}
-	}
 	config.Save(m.cfg)
 
-	// Sync statusline to the new workspace if globally enabled
+	// Sync settings to the new workspace
 	m.statusMsg = ""
-	if m.cfg.StatusLine {
-		if err := config.SyncStatusLine(m.cfg); err != nil {
-			m.statusMsg = fmt.Sprintf("statusline sync error: %v", err)
-		}
+	if err := config.SyncWorkspaceSettings(m.cfg, name); err != nil {
+		m.statusMsg = fmt.Sprintf("settings sync error: %v", err)
 	}
 }
 
@@ -442,10 +432,8 @@ func (m *Model) applyWsRename() {
 	}
 	config.Save(m.cfg)
 	m.statusMsg = ""
-	if m.cfg.StatusLine {
-		if err := config.SyncStatusLine(m.cfg); err != nil {
-			m.statusMsg = fmt.Sprintf("statusline sync error: %v", err)
-		}
+	if err := config.SyncWorkspaceSettings(m.cfg, newName); err != nil {
+		m.statusMsg = fmt.Sprintf("settings sync error: %v", err)
 	}
 }
 

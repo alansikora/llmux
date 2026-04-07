@@ -63,16 +63,13 @@ var resumeCmd = &cobra.Command{
 		}
 
 		os.MkdirAll(result.SessionDir, 0755) //nolint:errcheck
+		config.SyncWorkspaceSettings(cfg, result.WorkspaceName) //nolint:errcheck
 		commands.Ensure()
 
 		env := os.Environ()
 		env = setEnv(env, "CLAUDE_CONFIG_DIR", result.SessionDir)
-		if result.APIKey != "" {
-			env = setEnv(env, "ANTHROPIC_API_KEY", result.APIKey)
-		}
 
-		// resume continues an existing worktree, so --worktree is never needed
-		claudeArgs := append([]string{"claude", "--continue"}, result.ClaudeArgs(false)...)
+		claudeArgs := []string{"claude", "--continue"}
 
 		fmt.Fprintf(os.Stderr, "\033[90m↳ resuming session %s in %s\033[0m\n", match.Name, match.Path)
 

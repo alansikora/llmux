@@ -46,7 +46,6 @@ func Load() (*Config, error) {
 	type legacyWorkspace struct {
 		Name     string `json:"name"`
 		Path     string `json:"path,omitempty"`
-		APIKey   string `json:"api_key,omitempty"`
 		Worktree bool   `json:"worktree,omitempty"`
 	}
 	type legacyConfig struct {
@@ -68,7 +67,6 @@ func Load() (*Config, error) {
 			for _, lws := range legacy.Workspaces {
 				cfg.Workspaces = append(cfg.Workspaces, Workspace{
 					Name:     lws.Name,
-					APIKey:   lws.APIKey,
 					Worktree: lws.Worktree,
 				})
 				if lws.Path != "" {
@@ -149,20 +147,73 @@ func newStatusLineConfig() map[string]any {
 	}
 }
 
-// SyncStatusLine adds or removes the statusLine setting from all workspace session settings.
-func SyncStatusLine(cfg *Config) error {
+// SyncWorkspaceSettings writes all llmux-managed keys to a workspace's
+// settings.json. It is idempotent and preserves unmanaged keys.
+// The write is skipped if the resulting JSON is identical to what is on disk.
+func SyncWorkspaceSettings(cfg *Config, wsName string) error {
+	existing, _ := os.ReadFile(filepath.Join(SessionDir(wsName), "settings.json"))
+
+	var settings map[string]any
+	if len(existing) > 0 {
+		json.Unmarshal(existing, &settings) //nolint:errcheck
+	}
+	if settings == nil {
+		settings = map[string]any{}
+	}
+
+	// statusLine
+	if cfg.StatusLine {
+		settings["statusLine"] = newStatusLineConfig()
+	} else {
+		delete(settings, "statusLine")
+	}
+
+	// permissions.defaultMode (auto mode)
+	// If permissions exists but is not an object, replace it so we can
+	// manage the defaultMode key reliably.
+	if raw, exists := settings["permissions"]; exists {
+		if _, ok := raw.(map[string]any); !ok {
+			fmt.Fprintf(os.Stderr, "llmux: warning: workspace %s has non-object permissions in settings.json, resetting\n", wsName)
+			delete(settings, "permissions")
+		}
+	}
+	if cfg.AutoMode {
+		perms, _ := settings["permissions"].(map[string]any)
+		if perms == nil {
+			perms = map[string]any{}
+		}
+		perms["defaultMode"] = "auto"
+		settings["permissions"] = perms
+	} else {
+		if perms, ok := settings["permissions"].(map[string]any); ok {
+			delete(perms, "defaultMode")
+			if len(perms) == 0 {
+				delete(settings, "permissions")
+			}
+		}
+	}
+
+	// Skip write if nothing changed to avoid unnecessary I/O and write races.
+	// Normalize existing bytes through marshal to make comparison format-independent.
+	updated, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return err
+	}
+	var existingParsed map[string]any
+	if json.Unmarshal(existing, &existingParsed) == nil {
+		existingNorm, _ := json.MarshalIndent(existingParsed, "", "  ")
+		if string(updated) == string(existingNorm) {
+			return nil
+		}
+	}
+	return WriteSessionSettings(wsName, settings)
+}
+
+// SyncAllWorkspaceSettings syncs settings for all workspaces.
+func SyncAllWorkspaceSettings(cfg *Config) error {
 	var errs []error
 	for _, ws := range cfg.Workspaces {
-		settings := ReadSessionSettings(ws.Name)
-		if settings == nil {
-			settings = map[string]any{}
-		}
-		if cfg.StatusLine {
-			settings["statusLine"] = newStatusLineConfig()
-		} else {
-			delete(settings, "statusLine")
-		}
-		if err := WriteSessionSettings(ws.Name, settings); err != nil {
+		if err := SyncWorkspaceSettings(cfg, ws.Name); err != nil {
 			errs = append(errs, fmt.Errorf("workspace %s: %w", ws.Name, err))
 		}
 	}
