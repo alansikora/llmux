@@ -172,19 +172,29 @@ func Apply(workspacePath, sessionName string, applyMarker ...bool) error {
 
 	// Snapshot the session's full working state (committed + staged + unstaged)
 	// git add -N marks untracked files so they appear in diffs
-	runGit(session.Path, "add", "-N", ".") //nolint:errcheck
+	if _, err := runGit(session.Path, "add", "-N", "."); err != nil {
+		if stashCreated {
+			runGit(workspacePath, "stash", "pop") //nolint:errcheck
+		}
+		return fmt.Errorf("staging untracked files for snapshot: %w", err)
+	}
 	// git stash create returns a ref capturing everything, without side effects
-	stashOut, _ := runGit(session.Path, "stash", "create")
-	// Restore the session's original index state
-	runGit(session.Path, "reset") //nolint:errcheck
+	stashOut, stashErr := runGit(session.Path, "stash", "create")
+	// Restore the session's original index state before checking stash error
+	if _, err := runGit(session.Path, "reset"); err != nil {
+		if stashCreated {
+			runGit(workspacePath, "stash", "pop") //nolint:errcheck
+		}
+		return fmt.Errorf("restoring session index: %w", err)
+	}
 
 	ref := strings.TrimSpace(stashOut)
-	if ref == "" {
+	if stashErr != nil || ref == "" {
 		ref = session.Branch // no uncommitted changes, use branch as-is
 	}
 
 	// Generate diff from main HEAD to the full snapshot
-	diff, err := runGit(workspacePath, "diff", "HEAD..."+ref)
+	diff, err := runGit(workspacePath, "diff", "HEAD", ref)
 	if err != nil {
 		if stashCreated {
 			runGit(workspacePath, "stash", "pop") //nolint:errcheck
