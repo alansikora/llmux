@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/allskar/llmux/internal/commands"
 	"github.com/allskar/llmux/internal/config"
@@ -28,19 +31,55 @@ func isGitRepo(dir string) bool {
 	}
 }
 
-// isClaudeSubcommand checks whether the given claude CLI arguments start with
-// a subcommand rather than an interactive session. A single bare word (no
-// spaces) as the first positional argument is treated as a subcommand (e.g.
-// "mcp", "config"). A quoted multi-word argument is treated as a session
-// prompt (e.g. "fix the login bug"). No positional args means a plain
-// interactive session.
+// getClaudeSubcommands runs `claude --help` and parses the Commands section
+// to discover the current set of subcommands dynamically.
+func getClaudeSubcommands() map[string]bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	out, err := exec.CommandContext(ctx, "claude", "--help").CombinedOutput()
+	if err != nil {
+		return nil
+	}
+
+	subcmds := make(map[string]bool)
+	lines := strings.Split(string(out), "\n")
+	inCommands := false
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "Commands:" {
+			inCommands = true
+			continue
+		}
+		if !inCommands {
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			break
+		}
+		// First field is the command name, possibly with "|" aliases
+		// e.g. "plugin|plugins", "update|upgrade"
+		name := strings.Fields(trimmed)[0]
+		for _, n := range strings.Split(name, "|") {
+			subcmds[n] = true
+		}
+	}
+	return subcmds
+}
+
+// isClaudeSubcommand checks whether the first positional argument in the
+// claude args matches a real claude subcommand (queried from `claude --help`).
+// If we can't determine the subcommands, we assume it's an interactive session.
 func isClaudeSubcommand(claudeArgs []string) bool {
 	for _, a := range claudeArgs {
 		if strings.HasPrefix(a, "-") {
 			continue
 		}
-		// A quoted prompt contains spaces; a subcommand is a single word.
-		return !strings.Contains(a, " ")
+		subcmds := getClaudeSubcommands()
+		if subcmds == nil {
+			return false // can't tell — default to session behavior
+		}
+		return subcmds[a]
 	}
 	return false
 }
