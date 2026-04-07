@@ -80,6 +80,33 @@ func (p projectItem) Description() string {
 
 func (p projectItem) FilterValue() string { return filepath.Base(p.path) }
 
+// --- Item builders ---
+
+func workspaceItems(cfg *config.Config) []list.Item {
+	items := make([]list.Item, len(cfg.Workspaces))
+	for i, ws := range cfg.Workspaces {
+		items[i] = workspaceItem{
+			name:         ws.Name,
+			authInfo:     config.GetAuthInfo(ws.Name),
+			isDefault:    ws.Name == cfg.DefaultWorkspace,
+			projectCount: len(cfg.ProjectsForWorkspace(ws.Name)),
+		}
+	}
+	return items
+}
+
+func projectItems(projects []config.Project) []list.Item {
+	items := make([]list.Item, len(projects))
+	for i, p := range projects {
+		items[i] = projectItem{
+			path:      p.Path,
+			workspace: p.Workspace,
+			overrides: p.Overrides,
+		}
+	}
+	return items
+}
+
 // --- List builders ---
 
 const logo = ` _ _
@@ -92,18 +119,8 @@ const logo = ` _ _
 var headerHeight = strings.Count(logo, "\n") + 3
 
 func buildWorkspaceList(cfg *config.Config, version string, width, height int) list.Model {
-	items := make([]list.Item, len(cfg.Workspaces))
-	for i, ws := range cfg.Workspaces {
-		items[i] = workspaceItem{
-			name:         ws.Name,
-			authInfo:     config.GetAuthInfo(ws.Name),
-			isDefault:    ws.Name == cfg.DefaultWorkspace,
-			projectCount: len(cfg.ProjectsForWorkspace(ws.Name)),
-		}
-	}
-
 	delegate := list.NewDefaultDelegate()
-	l := list.New(items, delegate, width, height)
+	l := list.New(workspaceItems(cfg), delegate, width, height)
 	l.Title = "Workspaces"
 	l.SetShowStatusBar(true)
 	l.SetShowHelp(true)
@@ -123,17 +140,8 @@ func buildWorkspaceList(cfg *config.Config, version string, width, height int) l
 }
 
 func buildProjectList(projects []config.Project, wsName string, width, height int) list.Model {
-	items := make([]list.Item, len(projects))
-	for i, p := range projects {
-		items[i] = projectItem{
-			path:      p.Path,
-			workspace: p.Workspace,
-			overrides: p.Overrides,
-		}
-	}
-
 	delegate := list.NewDefaultDelegate()
-	l := list.New(items, delegate, width, height)
+	l := list.New(projectItems(projects), delegate, width, height)
 	l.Title = fmt.Sprintf("Projects: %s", wsName)
 	l.SetShowStatusBar(true)
 	l.SetShowHelp(true)

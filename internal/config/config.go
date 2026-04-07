@@ -147,15 +147,8 @@ func (c *Config) AddProject(path, workspaceName string) error {
 	abs = filepath.Clean(abs)
 
 	// Verify workspace exists
-	wsFound := false
-	for _, ws := range c.Workspaces {
-		if ws.Name == workspaceName {
-			wsFound = true
-			break
-		}
-	}
-	if !wsFound {
-		return fmt.Errorf("workspace %q not found", workspaceName)
+	if _, err := c.FindWorkspace(workspaceName); err != nil {
+		return err
 	}
 
 	// Check for duplicate path
@@ -193,15 +186,8 @@ func (c *Config) SetProjectWorkspace(path, workspaceName string) error {
 	abs = filepath.Clean(abs)
 
 	// Verify workspace exists
-	wsFound := false
-	for _, ws := range c.Workspaces {
-		if ws.Name == workspaceName {
-			wsFound = true
-			break
-		}
-	}
-	if !wsFound {
-		return fmt.Errorf("workspace %q not found", workspaceName)
+	if _, err := c.FindWorkspace(workspaceName); err != nil {
+		return err
 	}
 
 	for i, p := range c.Projects {
@@ -281,56 +267,23 @@ func (c *Config) FindWorkspaceForDir(dir string) (*Workspace, *Project, error) {
 // Resolve returns the session directory and config for the workspace
 // that best matches the given path through project lookup.
 func (c *Config) Resolve(dir string) (ResolveResult, error) {
-	dir = filepath.Clean(dir)
-
-	// Find best matching project
-	var bestProject *Project
-	bestLen := 0
-
-	for i := range c.Projects {
-		p := &c.Projects[i]
-		if dir == p.Path || strings.HasPrefix(dir, p.Path+"/") {
-			if len(p.Path) > bestLen {
-				bestProject = p
-				bestLen = len(p.Path)
-			}
-		}
+	ws, proj, err := c.FindWorkspaceForDir(dir)
+	if err != nil {
+		return ResolveResult{}, err
 	}
 
-	if bestProject != nil {
-		for i := range c.Workspaces {
-			if c.Workspaces[i].Name == bestProject.Workspace {
-				ws := &c.Workspaces[i]
-				return ResolveResult{
-					SessionDir:    SessionDir(ws.Name),
-					APIKey:        ws.APIKey,
-					Worktree:      bestProject.ResolvedWorktree(*ws),
-					AutoMode:      c.AutoMode,
-					WorkspaceName: ws.Name,
-					ProjectPath:   bestProject.Path,
-				}, nil
-			}
-		}
-		return ResolveResult{}, fmt.Errorf("workspace %q not found for project %s", bestProject.Workspace, bestProject.Path)
+	result := ResolveResult{
+		SessionDir:    SessionDir(ws.Name),
+		APIKey:        ws.APIKey,
+		Worktree:      ws.Worktree,
+		AutoMode:      c.AutoMode,
+		WorkspaceName: ws.Name,
 	}
-
-	// No project match — try default workspace
-	if c.DefaultWorkspace != "" {
-		for i := range c.Workspaces {
-			if c.Workspaces[i].Name == c.DefaultWorkspace {
-				ws := &c.Workspaces[i]
-				return ResolveResult{
-					SessionDir:    SessionDir(ws.Name),
-					APIKey:        ws.APIKey,
-					Worktree:      ws.Worktree,
-					AutoMode:      c.AutoMode,
-					WorkspaceName: ws.Name,
-				}, nil
-			}
-		}
+	if proj != nil {
+		result.Worktree = proj.ResolvedWorktree(*ws)
+		result.ProjectPath = proj.Path
 	}
-
-	return ResolveResult{}, ErrUnmapped
+	return result, nil
 }
 
 func (c *Config) SetDefault(name string) error {
