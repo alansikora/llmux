@@ -79,6 +79,9 @@ type Model struct {
 	// General options form
 	generalOptionsForm *huh.Form
 	generalOptionsData generalOptionsFormData
+
+	// Status message shown in workspace list view
+	statusMsg string
 }
 
 func NewModel(cfg *config.Config, version string, updateCh <-chan string) *Model {
@@ -311,7 +314,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cfg.AutoMode = m.generalOptionsData.AutoMode
 			m.cfg.StatusLine = m.generalOptionsData.StatusLine
 			config.Save(m.cfg)
-			config.SyncStatusLine(m.cfg)
+			if err := config.SyncStatusLine(m.cfg); err != nil {
+				m.statusMsg = fmt.Sprintf("statusline sync error: %v", err)
+			} else {
+				m.statusMsg = ""
+			}
 			m.state = stateWorkspaceList
 			m.refreshWorkspaceList()
 			return m, nil
@@ -337,6 +344,9 @@ func (m *Model) View() string {
 		}
 		header := headerParts + "\n\n"
 		content = header + m.list.View()
+		if m.statusMsg != "" {
+			content += "\n" + statusBarStyle.Render(m.statusMsg)
+		}
 	case stateWorkspaceAdding:
 		content = titleStyle.Render("Add Workspace") + "\n\n" + m.wsAddForm.View()
 	case stateWorkspaceOptions:
@@ -385,7 +395,9 @@ func (m *Model) applyWsAdd() {
 
 	// Sync statusline to the new workspace if globally enabled
 	if m.cfg.StatusLine {
-		config.SyncStatusLine(m.cfg)
+		if err := config.SyncStatusLine(m.cfg); err != nil {
+			m.statusMsg = fmt.Sprintf("statusline sync error: %v", err)
+		}
 	}
 }
 
