@@ -197,6 +197,10 @@ var resolveCmd = &cobra.Command{
 			}
 		}()
 
+		// Ensure session directory exists before EnsureSessionSymlinks runs,
+		// so commands are available on the very first launch of a new workspace.
+		os.MkdirAll(result.SessionDir, 0755) //nolint:errcheck
+
 		commands.Ensure()
 
 		versionLine := "\033[90m↳ llmux " + DisplayVersion()
