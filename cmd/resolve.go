@@ -98,7 +98,7 @@ var resolveCmd = &cobra.Command{
 			fmt.Fprintf(os.Stderr, "\033[90m↳ workspace: %s (default)\033[0m\n", result.WorkspaceName)
 		}
 		// Line 1: session directory
-		fmt.Print(result.SessionDir)
+		fmt.Println(result.SessionDir)
 
 		// Line 2: extra CLI flags (worktree or empty)
 		claudeArgs := args[1:] // everything after the path (passed via --)
@@ -106,12 +106,9 @@ var resolveCmd = &cobra.Command{
 		worktreeOverride := hasWorktreeOverride(claudeArgs)
 		if !subcmd && !worktreeOverride && result.Worktree && isGitRepo(args[0]) {
 			fmt.Fprint(os.Stderr, "\033[90m↳ worktree mode enabled. Use --no-worktree to open claude normally.\033[0m\n")
-			fmt.Print("\n--worktree")
-		} else {
-			if result.Worktree && !subcmd && !worktreeOverride {
-				fmt.Fprint(os.Stderr, "\033[90m↳ worktree mode skipped: not a git repository.\033[0m\n")
-			}
-			fmt.Print("\n")
+			fmt.Print("--worktree")
+		} else if result.Worktree && !subcmd && !worktreeOverride {
+			fmt.Fprint(os.Stderr, "\033[90m↳ worktree mode skipped: not a git repository.\033[0m\n")
 		}
 		return nil
 	},

@@ -149,7 +149,10 @@ func newStatusLineConfig() map[string]any {
 
 // SyncWorkspaceSettings writes all llmux-managed keys to a workspace's
 // settings.json. It is idempotent and preserves unmanaged keys.
+// The write is skipped if the resulting JSON is identical to what is on disk.
 func SyncWorkspaceSettings(cfg *Config, wsName string) error {
+	existing, _ := os.ReadFile(filepath.Join(SessionDir(wsName), "settings.json"))
+
 	settings := ReadSessionSettings(wsName)
 	if settings == nil {
 		settings = map[string]any{}
@@ -163,6 +166,14 @@ func SyncWorkspaceSettings(cfg *Config, wsName string) error {
 	}
 
 	// permissions.defaultMode (auto mode)
+	// If permissions exists but is not an object, replace it so we can
+	// manage the defaultMode key reliably.
+	if raw, exists := settings["permissions"]; exists {
+		if _, ok := raw.(map[string]any); !ok {
+			fmt.Fprintf(os.Stderr, "llmux: warning: workspace %s has non-object permissions in settings.json, resetting\n", wsName)
+			delete(settings, "permissions")
+		}
+	}
 	if cfg.AutoMode {
 		perms, _ := settings["permissions"].(map[string]any)
 		if perms == nil {
@@ -179,6 +190,14 @@ func SyncWorkspaceSettings(cfg *Config, wsName string) error {
 		}
 	}
 
+	// Skip write if nothing changed to avoid unnecessary I/O and write races.
+	updated, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return err
+	}
+	if string(updated) == string(existing) {
+		return nil
+	}
 	return WriteSessionSettings(wsName, settings)
 }
 
