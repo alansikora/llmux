@@ -140,7 +140,7 @@ func Apply(workspacePath, sessionName string, applyMarker ...bool) error {
 		return fmt.Errorf("session %q is already applied; run 'llmux unapply' first", applied)
 	}
 
-	session, err := FindSession(workspacePath, sessionName)
+	session, err := findSession(workspacePath, sessionName)
 	if err != nil {
 		return err
 	}
@@ -305,8 +305,8 @@ func listSessionsInSubdirs(parentPath string) ([]Session, error) {
 	return all, nil
 }
 
-// FindSession lists sessions in workspacePath and returns the one matching name.
-func FindSession(workspacePath, name string) (*Session, error) {
+// findSession lists sessions in workspacePath and returns the one matching name.
+func findSession(workspacePath, name string) (*Session, error) {
 	sessions, err := ListSessions(workspacePath)
 	if err != nil {
 		return nil, fmt.Errorf("listing sessions: %w", err)
@@ -334,7 +334,7 @@ func FindAppliedWorkspace(sessions []Session) (workspacePath, sessionName string
 }
 
 func Delete(workspacePath, sessionName string, force bool) error {
-	session, err := FindSession(workspacePath, sessionName)
+	session, err := findSession(workspacePath, sessionName)
 	if err != nil {
 		return err
 	}
