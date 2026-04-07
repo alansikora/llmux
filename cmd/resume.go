@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -32,6 +33,9 @@ var resumeCmd = &cobra.Command{
 
 		result, err := cfg.Resolve(cwd)
 		if err != nil {
+			if errors.Is(err, config.ErrUnmapped) {
+				return fmt.Errorf("current directory is not mapped to any workspace; run \"llmux\" to configure one")
+			}
 			return err
 		}
 
