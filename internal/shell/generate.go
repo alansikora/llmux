@@ -27,11 +27,11 @@ func rcFile(sh string) (string, error) {
 func snippet(bin string) string {
 	return fmt.Sprintf(`claude() {
   local resolve_output config_dir api_key worktree_flag
-  resolve_output="$(%s resolve "$(pwd -P)")"
+  resolve_output="$(%s resolve "$(pwd -P)" -- "$@")"
   local resolve_status=$?
   if [ $resolve_status -eq 2 ]; then
     %s register "$(pwd -P)" || return 1
-    resolve_output="$(%s resolve "$(pwd -P)")" || return 1
+    resolve_output="$(%s resolve "$(pwd -P)" -- "$@")" || return 1
   elif [ $resolve_status -ne 0 ]; then
     echo "llmux: no workspace configured for $(pwd -P)" >&2
     echo "Run 'llmux' to manage workspaces." >&2
@@ -78,11 +78,11 @@ func snippet(bin string) string {
 
 func fishSnippet(bin string) string {
 	return fmt.Sprintf(`function claude
-  set -l resolve_output (string split \n (%s resolve (pwd -P)))
+  set -l resolve_output (string split \n (%s resolve (pwd -P) -- $argv))
   set -l resolve_status $status
   if test $resolve_status -eq 2
     %s register (pwd -P); or return 1
-    set resolve_output (string split \n (%s resolve (pwd -P))); or return 1
+    set resolve_output (string split \n (%s resolve (pwd -P) -- $argv)); or return 1
   else if test $resolve_status -ne 0
     echo "llmux: no workspace configured for "(pwd -P) >&2
     echo "Run 'llmux' to manage workspaces." >&2

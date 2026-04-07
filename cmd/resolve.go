@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/allskar/llmux/internal/commands"
 	"github.com/allskar/llmux/internal/config"
@@ -27,10 +28,27 @@ func isGitRepo(dir string) bool {
 	}
 }
 
+// isClaudeSubcommand checks whether the given claude CLI arguments start with
+// a subcommand rather than an interactive session. A single bare word (no
+// spaces) as the first positional argument is treated as a subcommand (e.g.
+// "mcp", "config"). A quoted multi-word argument is treated as a session
+// prompt (e.g. "fix the login bug"). No positional args means a plain
+// interactive session.
+func isClaudeSubcommand(claudeArgs []string) bool {
+	for _, a := range claudeArgs {
+		if strings.HasPrefix(a, "-") {
+			continue
+		}
+		// A quoted prompt contains spaces; a subcommand is a single word.
+		return !strings.Contains(a, " ")
+	}
+	return false
+}
+
 var resolveCmd = &cobra.Command{
-	Use:           "resolve [path]",
+	Use:           "resolve [path] [-- claude-args...]",
 	Short:         "Resolve workspace for a path",
-	Args:          cobra.ExactArgs(1),
+	Args:          cobra.MinimumNArgs(1),
 	Hidden:        true,
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -72,18 +90,24 @@ var resolveCmd = &cobra.Command{
 		} else {
 			fmt.Print("\n")
 		}
+		// Check if the claude args indicate a subcommand (not an interactive session).
+		// Session flags (--worktree, --enable-auto-mode) are only injected for
+		// interactive sessions; subcommands like "mcp" and "config" get passed through.
+		claudeArgs := args[1:] // everything after the path (passed via --)
+		subcmd := isClaudeSubcommand(claudeArgs)
+
 		// Line 3: worktree flag (always print to keep line-based protocol stable)
-		if result.Worktree && isGitRepo(args[0]) {
+		if !subcmd && result.Worktree && isGitRepo(args[0]) {
 			fmt.Fprint(os.Stderr, "\033[90m↳ worktree mode enabled. Use --no-worktree to open claude normally.\033[0m\n")
 			fmt.Print("\n--worktree")
 		} else {
-			if result.Worktree {
+			if result.Worktree && !subcmd {
 				fmt.Fprint(os.Stderr, "\033[90m↳ worktree mode skipped: not a git repository.\033[0m\n")
 			}
 			fmt.Print("\n")
 		}
 		// Line 4: auto mode flag (always print to keep line-based protocol stable)
-		if result.AutoMode {
+		if !subcmd && result.AutoMode {
 			fmt.Fprint(os.Stderr, "\033[90m↳ auto mode enabled\033[0m\n")
 			fmt.Print("\n--enable-auto-mode")
 		} else {
