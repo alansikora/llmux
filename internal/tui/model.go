@@ -394,11 +394,10 @@ func (m *Model) applyWsAdd() {
 	config.Save(m.cfg)
 
 	// Sync statusline to the new workspace if globally enabled
+	m.statusMsg = ""
 	if m.cfg.StatusLine {
 		if err := config.SyncStatusLine(m.cfg); err != nil {
 			m.statusMsg = fmt.Sprintf("statusline sync error: %v", err)
-		} else {
-			m.statusMsg = ""
 		}
 	}
 }
