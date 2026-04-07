@@ -383,18 +383,9 @@ func (m *Model) applyWsAdd() {
 	}
 	config.Save(m.cfg)
 
-	// Auto-add statusline to new workspace if globally enabled
+	// Sync statusline to the new workspace if globally enabled
 	if m.cfg.StatusLine {
-		settings := config.ReadSessionSettings(name)
-		if settings == nil {
-			settings = map[string]any{}
-		}
-		settings["statusLine"] = map[string]any{
-			"type":    "command",
-			"command": "bunx -y ccstatusline@latest",
-			"padding": 0,
-		}
-		config.WriteSessionSettings(name, settings)
+		config.SyncStatusLine(m.cfg)
 	}
 }
 

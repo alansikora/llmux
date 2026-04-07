@@ -2,6 +2,8 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -118,27 +120,33 @@ func ReadSessionSettings(name string) map[string]any {
 	return settings
 }
 
-// statusLineConfig is the ccstatusline configuration added to workspace settings.
-var statusLineConfig = map[string]any{
-	"type":    "command",
-	"command": "bunx -y ccstatusline@latest",
-	"padding": 0,
+// newStatusLineConfig returns a fresh copy of the ccstatusline configuration.
+func newStatusLineConfig() map[string]any {
+	return map[string]any{
+		"type":    "command",
+		"command": "bunx -y ccstatusline@latest",
+		"padding": 0,
+	}
 }
 
 // SyncStatusLine adds or removes the statusLine setting from all workspace session settings.
-func SyncStatusLine(cfg *Config) {
+func SyncStatusLine(cfg *Config) error {
+	var errs []error
 	for _, ws := range cfg.Workspaces {
 		settings := ReadSessionSettings(ws.Name)
 		if settings == nil {
 			settings = map[string]any{}
 		}
 		if cfg.StatusLine {
-			settings["statusLine"] = statusLineConfig
+			settings["statusLine"] = newStatusLineConfig()
 		} else {
 			delete(settings, "statusLine")
 		}
-		WriteSessionSettings(ws.Name, settings)
+		if err := WriteSessionSettings(ws.Name, settings); err != nil {
+			errs = append(errs, fmt.Errorf("workspace %s: %w", ws.Name, err))
+		}
 	}
+	return errors.Join(errs...)
 }
 
 // AuthInfo holds display information about a workspace's authentication.
