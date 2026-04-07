@@ -140,21 +140,9 @@ func Apply(workspacePath, sessionName string, applyMarker ...bool) error {
 		return fmt.Errorf("session %q is already applied; run 'llmux unapply' first", applied)
 	}
 
-	// Find the session and its branch
-	sessions, err := ListSessions(workspacePath)
+	session, err := findSession(workspacePath, sessionName)
 	if err != nil {
-		return fmt.Errorf("listing sessions: %w", err)
-	}
-
-	var session *Session
-	for i := range sessions {
-		if sessions[i].Name == sessionName {
-			session = &sessions[i]
-			break
-		}
-	}
-	if session == nil {
-		return fmt.Errorf("session %q not found", sessionName)
+		return err
 	}
 
 	// Check for dirty working tree and auto-stash
@@ -170,21 +158,23 @@ func Apply(workspacePath, sessionName string, applyMarker ...bool) error {
 		stashCreated = true
 	}
 
+	// Pop stash on any failure after this point
+	applied := false
+	defer func() {
+		if !applied && stashCreated {
+			runGit(workspacePath, "stash", "pop") //nolint:errcheck
+		}
+	}()
+
 	// Snapshot the session's full working state (committed + staged + unstaged)
 	// git add -N marks untracked files so they appear in diffs
 	if _, err := runGit(session.Path, "add", "-N", "."); err != nil {
-		if stashCreated {
-			runGit(workspacePath, "stash", "pop") //nolint:errcheck
-		}
 		return fmt.Errorf("staging untracked files for snapshot: %w", err)
 	}
 	// git stash create returns a ref capturing everything, without side effects
 	stashOut, stashErr := runGit(session.Path, "stash", "create")
 	// Restore the session's original index state before checking stash error
 	if _, err := runGit(session.Path, "reset"); err != nil {
-		if stashCreated {
-			runGit(workspacePath, "stash", "pop") //nolint:errcheck
-		}
 		return fmt.Errorf("restoring session index: %w", err)
 	}
 
@@ -196,16 +186,10 @@ func Apply(workspacePath, sessionName string, applyMarker ...bool) error {
 	// Generate diff from main HEAD to the full snapshot
 	diff, err := runGit(workspacePath, "diff", "HEAD", ref)
 	if err != nil {
-		if stashCreated {
-			runGit(workspacePath, "stash", "pop") //nolint:errcheck
-		}
 		return fmt.Errorf("generating diff: %w", err)
 	}
 
 	if strings.TrimSpace(diff) == "" {
-		if stashCreated {
-			runGit(workspacePath, "stash", "pop") //nolint:errcheck
-		}
 		return fmt.Errorf("no changes to apply from session %q", sessionName)
 	}
 
@@ -215,9 +199,6 @@ func Apply(workspacePath, sessionName string, applyMarker ...bool) error {
 	cmd.Stdin = strings.NewReader(diff)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		if stashCreated {
-			runGit(workspacePath, "stash", "pop") //nolint:errcheck
-		}
 		return fmt.Errorf("applying diff: %s\n%s", err, string(output))
 	}
 
@@ -235,6 +216,7 @@ func Apply(workspacePath, sessionName string, applyMarker ...bool) error {
 		writeMarker(workspacePath, sessionName, session.Branch)
 	}
 
+	applied = true
 	return nil
 }
 
@@ -323,6 +305,20 @@ func listSessionsInSubdirs(parentPath string) ([]Session, error) {
 	return all, nil
 }
 
+// findSession lists sessions in workspacePath and returns the one matching name.
+func findSession(workspacePath, name string) (*Session, error) {
+	sessions, err := ListSessions(workspacePath)
+	if err != nil {
+		return nil, fmt.Errorf("listing sessions: %w", err)
+	}
+	for i := range sessions {
+		if sessions[i].Name == name {
+			return &sessions[i], nil
+		}
+	}
+	return nil, fmt.Errorf("session %q not found", name)
+}
+
 func FindAppliedWorkspace(sessions []Session) (workspacePath, sessionName string, ok bool) {
 	seen := map[string]bool{}
 	for _, s := range sessions {
@@ -338,19 +334,9 @@ func FindAppliedWorkspace(sessions []Session) (workspacePath, sessionName string
 }
 
 func Delete(workspacePath, sessionName string, force bool) error {
-	sessions, err := ListSessions(workspacePath)
+	session, err := findSession(workspacePath, sessionName)
 	if err != nil {
-		return fmt.Errorf("listing sessions: %w", err)
-	}
-	var session *Session
-	for i := range sessions {
-		if sessions[i].Name == sessionName {
-			session = &sessions[i]
-			break
-		}
-	}
-	if session == nil {
-		return fmt.Errorf("session %q not found", sessionName)
+		return err
 	}
 	args := []string{"worktree", "remove", session.Path}
 	if force {

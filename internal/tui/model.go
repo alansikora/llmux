@@ -509,27 +509,9 @@ func (m *Model) applyProjOptions() {
 // --- Refresh helpers ---
 
 func (m *Model) refreshWorkspaceList() {
-	items := make([]list.Item, len(m.cfg.Workspaces))
-	for i, ws := range m.cfg.Workspaces {
-		items[i] = workspaceItem{
-			name:         ws.Name,
-			authInfo:     config.GetAuthInfo(ws.Name),
-			isDefault:    ws.Name == m.cfg.DefaultWorkspace,
-			projectCount: len(m.cfg.ProjectsForWorkspace(ws.Name)),
-		}
-	}
-	m.list.SetItems(items)
+	m.list.SetItems(workspaceItems(m.cfg))
 }
 
 func (m *Model) refreshProjectList() {
-	projects := m.cfg.ProjectsForWorkspace(m.projectsTarget)
-	items := make([]list.Item, len(projects))
-	for i, p := range projects {
-		items[i] = projectItem{
-			path:      p.Path,
-			workspace: p.Workspace,
-			overrides: p.Overrides,
-		}
-	}
-	m.projectList.SetItems(items)
+	m.projectList.SetItems(projectItems(m.cfg.ProjectsForWorkspace(m.projectsTarget)))
 }
