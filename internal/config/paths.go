@@ -169,8 +169,9 @@ func SyncStatusLine(cfg *Config) error {
 	return errors.Join(errs...)
 }
 
-// GetAttribution reports whether a workspace has attribution disabled.
-func GetAttribution(name string) bool {
+// IsAttributionDisabled reports whether the attribution-suppression key
+// is present in a workspace's session settings.
+func IsAttributionDisabled(name string) bool {
 	settings := ReadSessionSettings(name)
 	if settings == nil {
 		return false

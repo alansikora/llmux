@@ -460,7 +460,9 @@ func (m *Model) applyWsOptions(name string) {
 	config.Save(m.cfg)
 
 	// Update session settings (attribution)
-	config.SetAttribution(name, m.optionsData.DisableAttribution == "enabled")
+	if err := config.SetAttribution(name, m.optionsData.DisableAttribution == "enabled"); err != nil {
+		m.statusMsg = fmt.Sprintf("attribution error: %v", err)
+	}
 }
 
 func (m *Model) applyProjAdd() {

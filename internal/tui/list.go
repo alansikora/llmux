@@ -196,7 +196,7 @@ func updateWorkspaceList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "e":
 			if item, ok := m.list.SelectedItem().(workspaceItem); ok {
 				attrVal := "disabled"
-				if config.GetAttribution(item.name) {
+				if config.IsAttributionDisabled(item.name) {
 					attrVal = "enabled"
 				}
 				worktreeVal := "disabled"
@@ -287,7 +287,7 @@ func updateProjectList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 				defaults := &wsDefaults{}
 				if ws != nil {
 					defaults.Worktree = ws.Worktree
-					defaults.DisableAttribution = config.GetAttribution(ws.Name)
+					defaults.DisableAttribution = config.IsAttributionDisabled(ws.Name)
 				}
 
 				worktreeVal := "inherit"

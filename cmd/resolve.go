@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/allskar/llmux/internal/claude"
@@ -35,8 +34,8 @@ func isGitRepo(dir string) bool {
 // override logic that previously lived in the shell wrapper.
 func hasWorktreeOverride(claudeArgs []string) bool {
 	for _, a := range claudeArgs {
-		switch strings.TrimSpace(a) {
-		case "--no-worktree", "-nw", "--worktree", "--resume", "--continue", "-r", "-c":
+		switch a {
+		case "--no-worktree", "-nw", "--resume", "--continue", "-r", "-c":
 			return true
 		}
 	}
