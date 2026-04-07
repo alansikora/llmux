@@ -184,6 +184,19 @@ var resolveCmd = &cobra.Command{
 			return err
 		}
 
+		// Start the update check after early-exit checks so we don't leak a
+		// goroutine on paths that call os.Exit.  On cache hit the channel is
+		// pre-filled and the defer below is instant; on cache miss (once per
+		// 24 h) we wait up to 2 s for the network request to complete and
+		// write the cache file.
+		updateCh := update.CheckUpdateNoticeAsync(DisplayVersion())
+		defer func() {
+			select {
+			case <-updateCh:
+			case <-time.After(2 * time.Second):
+			}
+		}()
+
 		commands.Ensure()
 
 		versionLine := "\033[90m↳ llmux " + DisplayVersion()
@@ -192,10 +205,6 @@ var resolveCmd = &cobra.Command{
 		}
 		versionLine += "\033[0m\n"
 		fmt.Fprint(os.Stderr, versionLine)
-
-		// Refresh the cache in the background (non-blocking) so the next
-		// invocation has fresh data without stalling this one.
-		go update.CheckLatest()
 		if result.ProjectPath != "" {
 			projectName := filepath.Base(result.ProjectPath)
 			fmt.Fprintf(os.Stderr, "\033[90m↳ workspace: %s · project: %s\033[0m\n", result.WorkspaceName, projectName)
