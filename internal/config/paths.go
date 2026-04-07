@@ -46,7 +46,6 @@ func Load() (*Config, error) {
 	type legacyWorkspace struct {
 		Name     string `json:"name"`
 		Path     string `json:"path,omitempty"`
-		APIKey   string `json:"api_key,omitempty"`
 		Worktree bool   `json:"worktree,omitempty"`
 	}
 	type legacyConfig struct {
@@ -68,7 +67,6 @@ func Load() (*Config, error) {
 			for _, lws := range legacy.Workspaces {
 				cfg.Workspaces = append(cfg.Workspaces, Workspace{
 					Name:     lws.Name,
-					APIKey:   lws.APIKey,
 					Worktree: lws.Worktree,
 				})
 				if lws.Path != "" {
@@ -149,20 +147,46 @@ func newStatusLineConfig() map[string]any {
 	}
 }
 
-// SyncStatusLine adds or removes the statusLine setting from all workspace session settings.
-func SyncStatusLine(cfg *Config) error {
+// SyncWorkspaceSettings writes all llmux-managed keys to a workspace's
+// settings.json. It is idempotent and preserves unmanaged keys.
+func SyncWorkspaceSettings(cfg *Config, wsName string) error {
+	settings := ReadSessionSettings(wsName)
+	if settings == nil {
+		settings = map[string]any{}
+	}
+
+	// statusLine
+	if cfg.StatusLine {
+		settings["statusLine"] = newStatusLineConfig()
+	} else {
+		delete(settings, "statusLine")
+	}
+
+	// permissions.defaultMode (auto mode)
+	if cfg.AutoMode {
+		perms, _ := settings["permissions"].(map[string]any)
+		if perms == nil {
+			perms = map[string]any{}
+		}
+		perms["defaultMode"] = "auto"
+		settings["permissions"] = perms
+	} else {
+		if perms, ok := settings["permissions"].(map[string]any); ok {
+			delete(perms, "defaultMode")
+			if len(perms) == 0 {
+				delete(settings, "permissions")
+			}
+		}
+	}
+
+	return WriteSessionSettings(wsName, settings)
+}
+
+// SyncAllWorkspaceSettings syncs settings for all workspaces.
+func SyncAllWorkspaceSettings(cfg *Config) error {
 	var errs []error
 	for _, ws := range cfg.Workspaces {
-		settings := ReadSessionSettings(ws.Name)
-		if settings == nil {
-			settings = map[string]any{}
-		}
-		if cfg.StatusLine {
-			settings["statusLine"] = newStatusLineConfig()
-		} else {
-			delete(settings, "statusLine")
-		}
-		if err := WriteSessionSettings(ws.Name, settings); err != nil {
+		if err := SyncWorkspaceSettings(cfg, ws.Name); err != nil {
 			errs = append(errs, fmt.Errorf("workspace %s: %w", ws.Name, err))
 		}
 	}

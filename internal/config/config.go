@@ -11,7 +11,6 @@ var ErrUnmapped = errors.New("no project configured for this directory")
 
 type Workspace struct {
 	Name     string `json:"name"`
-	APIKey   string `json:"api_key,omitempty"`
 	Worktree bool   `json:"worktree,omitempty"`
 }
 
@@ -46,26 +45,9 @@ type Config struct {
 
 type ResolveResult struct {
 	SessionDir    string
-	APIKey        string
 	Worktree      bool
-	AutoMode      bool
 	WorkspaceName string
 	ProjectPath   string // empty if resolved via default workspace fallback
-}
-
-// ClaudeArgs returns the extra flags to pass to claude for an interactive session.
-// worktree controls whether --worktree is included; callers must determine
-// this themselves since it depends on context (git repo presence, subcommand
-// detection, etc.). All other session flags are derived from the result.
-func (r ResolveResult) ClaudeArgs(worktree bool) []string {
-	var args []string
-	if worktree {
-		args = append(args, "--worktree")
-	}
-	if r.AutoMode {
-		args = append(args, "--enable-auto-mode")
-	}
-	return args
 }
 
 func (c *Config) AddWorkspace(name string) error {
@@ -274,9 +256,7 @@ func (c *Config) Resolve(dir string) (ResolveResult, error) {
 
 	result := ResolveResult{
 		SessionDir:    SessionDir(ws.Name),
-		APIKey:        ws.APIKey,
 		Worktree:      ws.Worktree,
-		AutoMode:      c.AutoMode,
 		WorkspaceName: ws.Name,
 	}
 	if proj != nil {

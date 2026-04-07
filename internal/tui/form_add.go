@@ -16,10 +16,9 @@ func expandPath(p string) string {
 	return p
 }
 
-// Workspace add form: name + optional API key (no path)
+// Workspace add form: name only
 type wsAddFormData struct {
-	Name   string
-	APIKey string
+	Name string
 }
 
 func newWsAddForm(data *wsAddFormData) *huh.Form {
@@ -35,11 +34,6 @@ func newWsAddForm(data *wsAddFormData) *huh.Form {
 					}
 					return nil
 				}),
-			huh.NewInput().
-				Title("Anthropic API key").
-				Placeholder("(optional, uses existing env if empty)").
-				EchoMode(huh.EchoModePassword).
-				Value(&data.APIKey),
 		),
 	).WithKeyMap(formKeyMap())
 }
