@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -110,6 +111,7 @@ func buildWorkspaceList(cfg *config.Config, version string, width, height int) l
 		return []key.Binding{
 			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "projects")),
 			key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add")),
+			key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "rename")),
 			key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "edit")),
 			key.NewBinding(key.WithKeys("d", "x"), key.WithHelp("d", "delete")),
 			key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "set default")),
@@ -159,9 +161,21 @@ func updateWorkspaceList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "a":
 			m.state = stateWorkspaceAdding
-			m.wsAddData = wsAddFormData{}
+			defaultName := ""
+			if cwd, err := os.Getwd(); err == nil {
+				defaultName = filepath.Base(cwd)
+			}
+			m.wsAddData = wsAddFormData{Name: defaultName}
 			m.wsAddForm = newWsAddForm(&m.wsAddData)
 			return m, m.wsAddForm.Init()
+		case "r":
+			if item, ok := m.list.SelectedItem().(workspaceItem); ok {
+				m.wsRenameTarget = item.name
+				m.wsRenameData = wsRenameFormData{Name: item.name}
+				m.wsRenameForm = newWsRenameForm(&m.wsRenameData)
+				m.state = stateWorkspaceRenaming
+				return m, m.wsRenameForm.Init()
+			}
 		case "enter":
 			if item, ok := m.list.SelectedItem().(workspaceItem); ok {
 				m.projectsTarget = item.name

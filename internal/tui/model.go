@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/allskar/llmux/internal/config"
 	"github.com/charmbracelet/bubbles/list"
@@ -17,6 +18,7 @@ type state int
 const (
 	stateWorkspaceList    state = iota
 	stateWorkspaceAdding        // Add workspace (name + API key)
+	stateWorkspaceRenaming      // Rename workspace
 	stateWorkspaceOptions       // Edit workspace settings
 	stateWorkspaceDeleting      // Delete workspace confirmation
 	stateProjectList            // List projects for a workspace
@@ -45,6 +47,11 @@ type Model struct {
 	// Workspace add form
 	wsAddForm *huh.Form
 	wsAddData wsAddFormData
+
+	// Workspace rename form
+	wsRenameForm   *huh.Form
+	wsRenameData   wsRenameFormData
+	wsRenameTarget string // original workspace name
 
 	// Unified options form (used for both workspace and project)
 	optionsForm   *huh.Form
@@ -191,7 +198,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.sessionsLoading = false
 				// For forms, go back to appropriate parent
 				switch m.state {
-				case stateWorkspaceAdding, stateWorkspaceOptions, stateWorkspaceDeleting, stateGeneralOptions:
+				case stateWorkspaceAdding, stateWorkspaceRenaming, stateWorkspaceOptions, stateWorkspaceDeleting, stateGeneralOptions:
 					m.state = stateWorkspaceList
 					m.refreshWorkspaceList()
 				case stateProjectAdding, stateProjectOptions:
@@ -219,6 +226,23 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.wsAddForm.State == huh.StateAborted {
+			m.state = stateWorkspaceList
+			return m, nil
+		}
+		return m, cmd
+
+	case stateWorkspaceRenaming:
+		form, cmd := m.wsRenameForm.Update(msg)
+		if f, ok := form.(*huh.Form); ok {
+			m.wsRenameForm = f
+		}
+		if m.wsRenameForm.State == huh.StateCompleted {
+			m.applyWsRename()
+			m.state = stateWorkspaceList
+			m.refreshWorkspaceList()
+			return m, nil
+		}
+		if m.wsRenameForm.State == huh.StateAborted {
 			m.state = stateWorkspaceList
 			return m, nil
 		}
@@ -349,6 +373,8 @@ func (m *Model) View() string {
 		}
 	case stateWorkspaceAdding:
 		content = titleStyle.Render("Add Workspace") + "\n\n" + m.wsAddForm.View()
+	case stateWorkspaceRenaming:
+		content = titleStyle.Render("Rename: "+m.wsRenameTarget) + "\n\n" + m.wsRenameForm.View() + "\n" + hintStyle.Render("enter to save · esc to cancel")
 	case stateWorkspaceOptions:
 		content = titleStyle.Render("Options: "+m.wsOptionsTarget) + "\n\n" + m.optionsForm.View() + "\n" + hintStyle.Render("enter to save · esc to cancel")
 	case stateWorkspaceDeleting:
@@ -394,6 +420,26 @@ func (m *Model) applyWsAdd() {
 	config.Save(m.cfg)
 
 	// Sync statusline to the new workspace if globally enabled
+	m.statusMsg = ""
+	if m.cfg.StatusLine {
+		if err := config.SyncStatusLine(m.cfg); err != nil {
+			m.statusMsg = fmt.Sprintf("statusline sync error: %v", err)
+		}
+	}
+}
+
+func (m *Model) applyWsRename() {
+	oldName := m.wsRenameTarget
+	newName := strings.TrimSpace(m.wsRenameData.Name)
+	if err := m.cfg.RenameWorkspace(oldName, newName); err != nil {
+		m.statusMsg = fmt.Sprintf("rename error: %v", err)
+		return
+	}
+	if err := config.RenameSessionDir(oldName, newName); err != nil {
+		m.statusMsg = fmt.Sprintf("rename session dir error: %v", err)
+		return
+	}
+	config.Save(m.cfg)
 	m.statusMsg = ""
 	if m.cfg.StatusLine {
 		if err := config.SyncStatusLine(m.cfg); err != nil {

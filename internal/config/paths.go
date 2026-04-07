@@ -94,6 +94,17 @@ func Save(cfg *Config) error {
 	return os.WriteFile(ConfigFile(), data, 0644)
 }
 
+// RenameSessionDir renames the session directory from oldName to newName.
+// It is a no-op if the old directory does not exist.
+func RenameSessionDir(oldName, newName string) error {
+	oldDir := SessionDir(oldName)
+	if _, err := os.Stat(oldDir); os.IsNotExist(err) {
+		return nil
+	}
+	newDir := SessionDir(newName)
+	return os.Rename(oldDir, newDir)
+}
+
 // WriteSessionSettings writes a settings.json into the session directory.
 func WriteSessionSettings(name string, settings map[string]any) error {
 	dir := SessionDir(name)
