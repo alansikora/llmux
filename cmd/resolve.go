@@ -66,6 +66,9 @@ func readSubcmdCacheWithTTL(ttl time.Duration) map[string]bool {
 	if ttl > 0 && time.Since(c.CachedAt) > ttl {
 		return nil
 	}
+	if len(c.Subcommands) == 0 {
+		return nil
+	}
 	m := make(map[string]bool, len(c.Subcommands))
 	for _, s := range c.Subcommands {
 		m[s] = true
