@@ -41,6 +41,7 @@ type Config struct {
 	ShortAlias       bool        `json:"short_alias,omitempty"`
 	ApplyMarker      bool        `json:"apply_marker,omitempty"`
 	AutoMode         bool        `json:"auto_mode,omitempty"`
+	StatusLine       bool        `json:"status_line,omitempty"`
 }
 
 type ResolveResult struct {

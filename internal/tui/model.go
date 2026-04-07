@@ -309,7 +309,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cfg.ShortAlias = m.generalOptionsData.ShortAlias
 			m.cfg.ApplyMarker = m.generalOptionsData.ApplyMarker
 			m.cfg.AutoMode = m.generalOptionsData.AutoMode
+			m.cfg.StatusLine = m.generalOptionsData.StatusLine
 			config.Save(m.cfg)
+			config.SyncStatusLine(m.cfg)
 			m.state = stateWorkspaceList
 			m.refreshWorkspaceList()
 			return m, nil
@@ -380,6 +382,20 @@ func (m *Model) applyWsAdd() {
 		}
 	}
 	config.Save(m.cfg)
+
+	// Auto-add statusline to new workspace if globally enabled
+	if m.cfg.StatusLine {
+		settings := config.ReadSessionSettings(name)
+		if settings == nil {
+			settings = map[string]any{}
+		}
+		settings["statusLine"] = map[string]any{
+			"type":    "command",
+			"command": "bunx -y ccstatusline@latest",
+			"padding": 0,
+		}
+		config.WriteSessionSettings(name, settings)
+	}
 }
 
 func (m *Model) applyWsOptions(name string) {

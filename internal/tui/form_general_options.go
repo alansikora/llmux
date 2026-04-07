@@ -6,6 +6,7 @@ type generalOptionsFormData struct {
 	ShortAlias  bool
 	ApplyMarker bool
 	AutoMode    bool
+	StatusLine  bool
 }
 
 func newGeneralOptionsForm(data *generalOptionsFormData, orig generalOptionsFormData) *huh.Form {
@@ -35,6 +36,14 @@ func newGeneralOptionsForm(data *generalOptionsFormData, orig generalOptionsForm
 				Affirmative("Enabled").
 				Negative("Disabled").
 				Value(&data.AutoMode),
+			confirmLeft().
+				TitleFunc(func() string {
+					return dirtyTitle("Enable status line?", data.StatusLine != orig.StatusLine)
+				}, &data.StatusLine).
+				Description("Add ccstatusline to all workspace settings, showing model, context, and git info in Claude Code.").
+				Affirmative("Enabled").
+				Negative("Disabled").
+				Value(&data.StatusLine),
 		),
 	).WithKeyMap(formKeyMap())
 }

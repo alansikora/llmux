@@ -118,6 +118,29 @@ func ReadSessionSettings(name string) map[string]any {
 	return settings
 }
 
+// statusLineConfig is the ccstatusline configuration added to workspace settings.
+var statusLineConfig = map[string]any{
+	"type":    "command",
+	"command": "bunx -y ccstatusline@latest",
+	"padding": 0,
+}
+
+// SyncStatusLine adds or removes the statusLine setting from all workspace session settings.
+func SyncStatusLine(cfg *Config) {
+	for _, ws := range cfg.Workspaces {
+		settings := ReadSessionSettings(ws.Name)
+		if settings == nil {
+			settings = map[string]any{}
+		}
+		if cfg.StatusLine {
+			settings["statusLine"] = statusLineConfig
+		} else {
+			delete(settings, "statusLine")
+		}
+		WriteSessionSettings(ws.Name, settings)
+	}
+}
+
 // AuthInfo holds display information about a workspace's authentication.
 type AuthInfo struct {
 	Authenticated bool
