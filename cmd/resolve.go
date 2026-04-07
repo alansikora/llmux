@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -31,19 +32,50 @@ func isGitRepo(dir string) bool {
 	}
 }
 
-// getClaudeSubcommands runs `claude --help` and parses the Commands section
-// to discover the current set of subcommands dynamically.
-func getClaudeSubcommands() map[string]bool {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
+const subcmdCacheFile = "claude-subcommands.json"
 
-	out, err := exec.CommandContext(ctx, "claude", "--help").CombinedOutput()
+type subcmdCache struct {
+	Subcommands []string  `json:"subcommands"`
+	CachedAt    time.Time `json:"cached_at"`
+}
+
+func subcmdCachePath() string {
+	return filepath.Join(config.ConfigDir(), subcmdCacheFile)
+}
+
+func readSubcmdCache() map[string]bool {
+	data, err := os.ReadFile(subcmdCachePath())
 	if err != nil {
 		return nil
 	}
+	var c subcmdCache
+	if err := json.Unmarshal(data, &c); err != nil {
+		return nil
+	}
+	if time.Since(c.CachedAt) > 24*time.Hour {
+		return nil
+	}
+	m := make(map[string]bool, len(c.Subcommands))
+	for _, s := range c.Subcommands {
+		m[s] = true
+	}
+	return m
+}
 
+func writeSubcmdCache(subcmds map[string]bool) {
+	list := make([]string, 0, len(subcmds))
+	for s := range subcmds {
+		list = append(list, s)
+	}
+	data, _ := json.Marshal(subcmdCache{Subcommands: list, CachedAt: time.Now()})
+	os.MkdirAll(filepath.Dir(subcmdCachePath()), 0755)
+	os.WriteFile(subcmdCachePath(), data, 0644)
+}
+
+// parseClaudeSubcommands parses the Commands section from `claude --help` output.
+func parseClaudeSubcommands(output string) map[string]bool {
 	subcmds := make(map[string]bool)
-	lines := strings.Split(string(out), "\n")
+	lines := strings.Split(output, "\n")
 	inCommands := false
 	for _, line := range lines {
 		if strings.TrimSpace(line) == "Commands:" {
@@ -53,9 +85,13 @@ func getClaudeSubcommands() map[string]bool {
 		if !inCommands {
 			continue
 		}
+		// Stop at the next section header: a non-indented, non-empty line
+		if len(line) > 0 && line[0] != ' ' && line[0] != '\t' {
+			break
+		}
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
-			break
+			continue
 		}
 		// First field is the command name, possibly with "|" aliases
 		// e.g. "plugin|plugins", "update|upgrade"
@@ -63,6 +99,29 @@ func getClaudeSubcommands() map[string]bool {
 		for _, n := range strings.Split(name, "|") {
 			subcmds[n] = true
 		}
+	}
+	return subcmds
+}
+
+// getClaudeSubcommands returns the set of claude CLI subcommands, using a
+// cached result when available (24h TTL) to avoid spawning a subprocess on
+// every invocation.
+func getClaudeSubcommands() map[string]bool {
+	if cached := readSubcmdCache(); cached != nil {
+		return cached
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	out, err := exec.CommandContext(ctx, "claude", "--help").CombinedOutput()
+	if err != nil {
+		return nil
+	}
+
+	subcmds := parseClaudeSubcommands(string(out))
+	if len(subcmds) > 0 {
+		writeSubcmdCache(subcmds)
 	}
 	return subcmds
 }

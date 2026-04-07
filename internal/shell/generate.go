@@ -26,7 +26,7 @@ func rcFile(sh string) (string, error) {
 
 func snippet(bin string) string {
 	return fmt.Sprintf(`claude() {
-  local resolve_output config_dir api_key worktree_flag
+  local resolve_output config_dir api_key worktree_flag auto_mode_flag
   resolve_output="$(%s resolve "$(pwd -P)" -- "$@")"
   local resolve_status=$?
   if [ $resolve_status -eq 2 ]; then
