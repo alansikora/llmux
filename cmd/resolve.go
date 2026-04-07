@@ -211,19 +211,15 @@ var resolveCmd = &cobra.Command{
 		} else {
 			fmt.Fprintf(os.Stderr, "\033[90m↳ workspace: %s (default)\033[0m\n", result.WorkspaceName)
 		}
+		// Line 1: session dir
 		fmt.Print(result.SessionDir)
-		if result.APIKey != "" {
-			fmt.Print("\n" + result.APIKey)
-		} else {
-			fmt.Print("\n")
-		}
 		// Check if the claude args indicate a subcommand (not an interactive session).
-		// Session flags (--worktree, --enable-auto-mode) are only injected for
-		// interactive sessions; subcommands like "mcp" and "config" get passed through.
+		// Session flags (--worktree) are only injected for interactive sessions;
+		// subcommands like "mcp" and "config" get passed through.
 		claudeArgs := args[1:] // everything after the path (passed via --)
 		subcmd := isClaudeSubcommand(claudeArgs)
 
-		// Line 3: worktree flag (always print to keep line-based protocol stable)
+		// Line 2: worktree flag
 		if !subcmd && result.Worktree && isGitRepo(args[0]) {
 			fmt.Fprint(os.Stderr, "\033[90m↳ worktree mode enabled. Use --no-worktree to open claude normally.\033[0m\n")
 			fmt.Print("\n--worktree")
@@ -231,13 +227,6 @@ var resolveCmd = &cobra.Command{
 			if result.Worktree && !subcmd {
 				fmt.Fprint(os.Stderr, "\033[90m↳ worktree mode skipped: not a git repository.\033[0m\n")
 			}
-			fmt.Print("\n")
-		}
-		// Line 4: auto mode flag (always print to keep line-based protocol stable)
-		if !subcmd && result.AutoMode {
-			fmt.Fprint(os.Stderr, "\033[90m↳ auto mode enabled\033[0m\n")
-			fmt.Print("\n--enable-auto-mode")
-		} else {
 			fmt.Print("\n")
 		}
 		return nil

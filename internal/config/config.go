@@ -42,13 +42,12 @@ type Config struct {
 	ApplyMarker      bool        `json:"apply_marker,omitempty"`
 	AutoMode         bool        `json:"auto_mode,omitempty"`
 	StatusLine       bool        `json:"status_line,omitempty"`
+	EffortLevel      string      `json:"effort_level,omitempty"`
 }
 
 type ResolveResult struct {
 	SessionDir    string
-	APIKey        string
 	Worktree      bool
-	AutoMode      bool
 	WorkspaceName string
 	ProjectPath   string // empty if resolved via default workspace fallback
 }
@@ -288,9 +287,7 @@ func (c *Config) Resolve(dir string) (ResolveResult, error) {
 				ws := &c.Workspaces[i]
 				return ResolveResult{
 					SessionDir:    SessionDir(ws.Name),
-					APIKey:        ws.APIKey,
 					Worktree:      bestProject.ResolvedWorktree(*ws),
-					AutoMode:      c.AutoMode,
 					WorkspaceName: ws.Name,
 					ProjectPath:   bestProject.Path,
 				}, nil
@@ -306,9 +303,7 @@ func (c *Config) Resolve(dir string) (ResolveResult, error) {
 				ws := &c.Workspaces[i]
 				return ResolveResult{
 					SessionDir:    SessionDir(ws.Name),
-					APIKey:        ws.APIKey,
 					Worktree:      ws.Worktree,
-					AutoMode:      c.AutoMode,
 					WorkspaceName: ws.Name,
 				}, nil
 			}

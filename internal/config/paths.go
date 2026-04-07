@@ -145,8 +145,8 @@ func newStatusLineConfig() map[string]any {
 	}
 }
 
-// SyncStatusLine adds or removes the statusLine setting from all workspace session settings.
-func SyncStatusLine(cfg *Config) error {
+// SyncGlobalSettings syncs global options (statusLine, autoMode, effort) to all workspace session settings.
+func SyncGlobalSettings(cfg *Config) error {
 	var errs []error
 	for _, ws := range cfg.Workspaces {
 		settings := ReadSessionSettings(ws.Name)
@@ -157,6 +157,42 @@ func SyncStatusLine(cfg *Config) error {
 			settings["statusLine"] = newStatusLineConfig()
 		} else {
 			delete(settings, "statusLine")
+		}
+		// Auto mode: set permissions.defaultMode
+		if cfg.AutoMode {
+			perms, _ := settings["permissions"].(map[string]any)
+			if perms == nil {
+				perms = map[string]any{}
+			}
+			perms["defaultMode"] = "auto"
+			settings["permissions"] = perms
+		} else {
+			if perms, ok := settings["permissions"].(map[string]any); ok {
+				delete(perms, "defaultMode")
+				if len(perms) == 0 {
+					delete(settings, "permissions")
+				}
+			}
+		}
+		// Build env section: effort level + API key
+		env, _ := settings["env"].(map[string]any)
+		if env == nil {
+			env = map[string]any{}
+		}
+		if cfg.EffortLevel != "" {
+			env["CLAUDE_CODE_EFFORT_LEVEL"] = cfg.EffortLevel
+		} else {
+			delete(env, "CLAUDE_CODE_EFFORT_LEVEL")
+		}
+		if ws.APIKey != "" {
+			env["ANTHROPIC_API_KEY"] = ws.APIKey
+		} else {
+			delete(env, "ANTHROPIC_API_KEY")
+		}
+		if len(env) > 0 {
+			settings["env"] = env
+		} else {
+			delete(settings, "env")
 		}
 		if err := WriteSessionSettings(ws.Name, settings); err != nil {
 			errs = append(errs, fmt.Errorf("workspace %s: %w", ws.Name, err))

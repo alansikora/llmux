@@ -229,6 +229,7 @@ func updateWorkspaceList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 				ApplyMarker: m.cfg.ApplyMarker,
 				AutoMode:    m.cfg.AutoMode,
 				StatusLine:  m.cfg.StatusLine,
+				EffortLevel: m.cfg.EffortLevel,
 			}
 			m.generalOptionsForm = newGeneralOptionsForm(&m.generalOptionsData, m.generalOptionsData)
 			m.state = stateGeneralOptions

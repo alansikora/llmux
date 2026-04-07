@@ -337,9 +337,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cfg.ApplyMarker = m.generalOptionsData.ApplyMarker
 			m.cfg.AutoMode = m.generalOptionsData.AutoMode
 			m.cfg.StatusLine = m.generalOptionsData.StatusLine
+			m.cfg.EffortLevel = m.generalOptionsData.EffortLevel
 			config.Save(m.cfg)
-			if err := config.SyncStatusLine(m.cfg); err != nil {
-				m.statusMsg = fmt.Sprintf("statusline sync error: %v", err)
+			if err := config.SyncGlobalSettings(m.cfg); err != nil {
+				m.statusMsg = fmt.Sprintf("settings sync error: %v", err)
 			} else {
 				m.statusMsg = ""
 			}
@@ -419,12 +420,10 @@ func (m *Model) applyWsAdd() {
 	}
 	config.Save(m.cfg)
 
-	// Sync statusline to the new workspace if globally enabled
+	// Sync global settings (statusLine, autoMode, effort) to the new workspace
 	m.statusMsg = ""
-	if m.cfg.StatusLine {
-		if err := config.SyncStatusLine(m.cfg); err != nil {
-			m.statusMsg = fmt.Sprintf("statusline sync error: %v", err)
-		}
+	if err := config.SyncGlobalSettings(m.cfg); err != nil {
+		m.statusMsg = fmt.Sprintf("settings sync error: %v", err)
 	}
 }
 
@@ -442,10 +441,8 @@ func (m *Model) applyWsRename() {
 	}
 	config.Save(m.cfg)
 	m.statusMsg = ""
-	if m.cfg.StatusLine {
-		if err := config.SyncStatusLine(m.cfg); err != nil {
-			m.statusMsg = fmt.Sprintf("statusline sync error: %v", err)
-		}
+	if err := config.SyncGlobalSettings(m.cfg); err != nil {
+		m.statusMsg = fmt.Sprintf("settings sync error: %v", err)
 	}
 }
 

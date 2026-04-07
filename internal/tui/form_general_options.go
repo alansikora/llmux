@@ -7,6 +7,7 @@ type generalOptionsFormData struct {
 	ApplyMarker bool
 	AutoMode    bool
 	StatusLine  bool
+	EffortLevel string
 }
 
 func newGeneralOptionsForm(data *generalOptionsFormData, orig generalOptionsFormData) *huh.Form {
@@ -32,7 +33,7 @@ func newGeneralOptionsForm(data *generalOptionsFormData, orig generalOptionsForm
 				TitleFunc(func() string {
 					return dirtyTitle("Enable auto mode?", data.AutoMode != orig.AutoMode)
 				}, &data.AutoMode).
-				Description("Pass --enable-auto-mode to Claude Code, allowing it to run without confirmation prompts.").
+				Description("Enable auto mode in Claude Code, allowing it to run without confirmation prompts.").
 				Affirmative("Enabled").
 				Negative("Disabled").
 				Value(&data.AutoMode),
@@ -44,6 +45,20 @@ func newGeneralOptionsForm(data *generalOptionsFormData, orig generalOptionsForm
 				Affirmative("Enabled").
 				Negative("Disabled").
 				Value(&data.StatusLine),
+			huh.NewSelect[string]().
+				TitleFunc(func() string {
+					return dirtyTitle("Default effort level", data.EffortLevel != orig.EffortLevel)
+				}, &data.EffortLevel).
+				Description("Set the default effort level for Claude Code sessions.").
+				Options(
+					huh.NewOption("Default (no flag)", ""),
+					huh.NewOption("Min", "min"),
+					huh.NewOption("Low", "low"),
+					huh.NewOption("Medium", "medium"),
+					huh.NewOption("High", "high"),
+					huh.NewOption("Max (Opus 4.6 only)", "max"),
+				).
+				Value(&data.EffortLevel),
 		),
 	).WithKeyMap(formKeyMap())
 }
