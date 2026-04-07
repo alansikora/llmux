@@ -53,6 +53,21 @@ type ResolveResult struct {
 	ProjectPath   string // empty if resolved via default workspace fallback
 }
 
+// ClaudeArgs returns the extra flags to pass to claude for an interactive session.
+// worktree controls whether --worktree is included; callers must determine
+// this themselves since it depends on context (git repo presence, subcommand
+// detection, etc.). All other session flags are derived from the result.
+func (r ResolveResult) ClaudeArgs(worktree bool) []string {
+	var args []string
+	if worktree {
+		args = append(args, "--worktree")
+	}
+	if r.AutoMode {
+		args = append(args, "--enable-auto-mode")
+	}
+	return args
+}
+
 func (c *Config) AddWorkspace(name string) error {
 	for _, ws := range c.Workspaces {
 		if ws.Name == name {

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -25,15 +26,19 @@ var resumeCmd = &cobra.Command{
 			return err
 		}
 
-		ws, _, err := resolveWorkspace(cfg, nil)
-		if err != nil {
-			return err
-		}
-
 		cwd, err := os.Getwd()
 		if err != nil {
 			return err
 		}
+
+		result, err := cfg.Resolve(cwd)
+		if err != nil {
+			if errors.Is(err, config.ErrUnmapped) {
+				return fmt.Errorf("current directory is not mapped to any workspace; run \"llmux\" to configure one")
+			}
+			return err
+		}
+
 		sessionsPath := worktree.ResolveSessionsPath(cwd)
 
 		sessions, err := worktree.ListSessions(sessionsPath)
@@ -57,14 +62,17 @@ var resumeCmd = &cobra.Command{
 			return fmt.Errorf("claude not found in PATH: %w", err)
 		}
 
-		sessionDir := config.SessionDir(ws.Name)
+		os.MkdirAll(result.SessionDir, 0755) //nolint:errcheck
 		commands.Ensure()
 
 		env := os.Environ()
-		env = setEnv(env, "CLAUDE_CONFIG_DIR", sessionDir)
-		if ws.APIKey != "" {
-			env = setEnv(env, "ANTHROPIC_API_KEY", ws.APIKey)
+		env = setEnv(env, "CLAUDE_CONFIG_DIR", result.SessionDir)
+		if result.APIKey != "" {
+			env = setEnv(env, "ANTHROPIC_API_KEY", result.APIKey)
 		}
+
+		// resume continues an existing worktree, so --worktree is never needed
+		claudeArgs := append([]string{"claude", "--continue"}, result.ClaudeArgs(false)...)
 
 		fmt.Fprintf(os.Stderr, "\033[90m↳ resuming session %s in %s\033[0m\n", match.Name, match.Path)
 
@@ -72,7 +80,7 @@ var resumeCmd = &cobra.Command{
 			return fmt.Errorf("changing to worktree directory: %w", err)
 		}
 
-		return syscall.Exec(claudePath, []string{"claude", "--continue"}, env)
+		return syscall.Exec(claudePath, claudeArgs, env)
 	},
 }
 
