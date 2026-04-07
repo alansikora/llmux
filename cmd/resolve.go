@@ -81,12 +81,15 @@ func writeSubcmdCache(subcmds map[string]bool) {
 	for s := range subcmds {
 		list = append(list, s)
 	}
-	data, _ := json.Marshal(subcmdCache{Subcommands: list, CachedAt: time.Now()})
+	data, err := json.Marshal(subcmdCache{Subcommands: list, CachedAt: time.Now()})
+	if err != nil {
+		return
+	}
 	p := subcmdCachePath()
 	if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
 		return
 	}
-	os.WriteFile(p, data, 0644)
+	_ = os.WriteFile(p, data, 0644)
 }
 
 // parseClaudeSubcommands parses the Commands section from `claude --help` output.
