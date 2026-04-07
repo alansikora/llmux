@@ -171,6 +171,11 @@ var resolveCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Start the update check early so the network request runs while we
+		// do everything else.  We drain the channel before exiting so the
+		// goroutine has time to write the cache file.
+		updateCh := update.CheckUpdateNoticeAsync(DisplayVersion())
+
 		cfg, err := config.Load()
 		if err != nil {
 			return err
@@ -192,10 +197,6 @@ var resolveCmd = &cobra.Command{
 		}
 		versionLine += "\033[0m\n"
 		fmt.Fprint(os.Stderr, versionLine)
-
-		// Refresh the cache in the background (non-blocking) so the next
-		// invocation has fresh data without stalling this one.
-		go update.CheckLatest()
 		if result.ProjectPath != "" {
 			projectName := filepath.Base(result.ProjectPath)
 			fmt.Fprintf(os.Stderr, "\033[90m↳ workspace: %s · project: %s\033[0m\n", result.WorkspaceName, projectName)
@@ -230,6 +231,13 @@ var resolveCmd = &cobra.Command{
 			fmt.Print("\n--enable-auto-mode")
 		} else {
 			fmt.Print("\n")
+		}
+
+		// Wait for the background update check to finish (writes cache for
+		// next invocation). Use a short timeout so we never block long.
+		select {
+		case <-updateCh:
+		case <-time.After(3 * time.Second):
 		}
 		return nil
 	},
