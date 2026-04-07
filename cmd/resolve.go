@@ -171,11 +171,6 @@ var resolveCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Start the update check early so the network request runs while we
-		// do everything else.  We drain the channel before exiting so the
-		// goroutine has time to write the cache file.
-		updateCh := update.CheckUpdateNoticeAsync(DisplayVersion())
-
 		cfg, err := config.Load()
 		if err != nil {
 			return err
@@ -188,6 +183,19 @@ var resolveCmd = &cobra.Command{
 			}
 			return err
 		}
+
+		// Start the update check after early-exit checks so we don't leak a
+		// goroutine on paths that call os.Exit.  On cache hit the channel is
+		// pre-filled and the defer below is instant; on cache miss (once per
+		// 24 h) we wait up to 2 s for the network request to complete and
+		// write the cache file.
+		updateCh := update.CheckUpdateNoticeAsync(DisplayVersion())
+		defer func() {
+			select {
+			case <-updateCh:
+			case <-time.After(2 * time.Second):
+			}
+		}()
 
 		commands.Ensure()
 
@@ -231,13 +239,6 @@ var resolveCmd = &cobra.Command{
 			fmt.Print("\n--enable-auto-mode")
 		} else {
 			fmt.Print("\n")
-		}
-
-		// Wait for the background update check to finish (writes cache for
-		// next invocation). Use a short timeout so we never block long.
-		select {
-		case <-updateCh:
-		case <-time.After(3 * time.Second):
 		}
 		return nil
 	},
