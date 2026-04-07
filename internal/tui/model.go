@@ -397,6 +397,8 @@ func (m *Model) applyWsAdd() {
 	if m.cfg.StatusLine {
 		if err := config.SyncStatusLine(m.cfg); err != nil {
 			m.statusMsg = fmt.Sprintf("statusline sync error: %v", err)
+		} else {
+			m.statusMsg = ""
 		}
 	}
 }
