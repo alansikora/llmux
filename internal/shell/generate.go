@@ -41,29 +41,20 @@ func snippet(bin string) string {
   api_key="$(echo "$resolve_output" | sed -n '2p')"
   worktree_flag="$(echo "$resolve_output" | sed -n '3p')"
   auto_mode_flag="$(echo "$resolve_output" | sed -n '4p')"
-  local args=("$@")
-  if [ "$worktree_flag" = "--worktree" ]; then
-    local skip_worktree=false filtered=()
-    for arg in "${args[@]}"; do
-      if [ "$arg" = "--no-worktree" ] || [ "$arg" = "-nw" ]; then
-        skip_worktree=true
-      elif [ "$arg" = "--worktree" ] || [ "$arg" = "--resume" ] || [ "$arg" = "--continue" ] || [ "$arg" = "-r" ] || [ "$arg" = "-c" ]; then
-        skip_worktree=true
-        filtered+=("$arg")
-      else
-        filtered+=("$arg")
-      fi
-    done
-    if [ "$skip_worktree" = false ]; then
-      local default_branch
-      default_branch="$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')"
-      if [ -n "$default_branch" ]; then
-        git fetch origin "$default_branch" 2>/dev/null
-      fi
-      args=("--worktree" "${filtered[@]}")
-    else
-      args=("${filtered[@]}")
+  local args=()
+  for arg in "$@"; do
+    if [ "$arg" = "--no-worktree" ] || [ "$arg" = "-nw" ]; then
+      continue
     fi
+    args+=("$arg")
+  done
+  if [ "$worktree_flag" = "--worktree" ]; then
+    local default_branch
+    default_branch="$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')"
+    if [ -n "$default_branch" ]; then
+      git fetch origin "$default_branch" 2>/dev/null
+    fi
+    args=("--worktree" "${args[@]}")
   fi
   if [ "$auto_mode_flag" = "--enable-auto-mode" ]; then
     args=("$auto_mode_flag" "${args[@]}")
@@ -101,29 +92,19 @@ func fishSnippet(bin string) string {
   if test (count $resolve_output) -ge 4
     set auto_mode_flag $resolve_output[4]
   end
-  set -l args $argv
+  set -l args
+  for arg in $argv
+    if test "$arg" = "--no-worktree" -o "$arg" = "-nw"
+      continue
+    end
+    set -a args $arg
+  end
   if test "$worktree_flag" = "--worktree"
-    set -l filtered
-    set -l skip_worktree false
-    for arg in $args
-      if test "$arg" = "--no-worktree" -o "$arg" = "-nw"
-        set skip_worktree true
-      else if test "$arg" = "--worktree" -o "$arg" = "--resume" -o "$arg" = "--continue" -o "$arg" = "-r" -o "$arg" = "-c"
-        set skip_worktree true
-        set -a filtered $arg
-      else
-        set -a filtered $arg
-      end
+    set -l default_branch (git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+    if test -n "$default_branch"
+      git fetch origin $default_branch 2>/dev/null
     end
-    if test "$skip_worktree" = false
-      set -l default_branch (git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
-      if test -n "$default_branch"
-        git fetch origin $default_branch 2>/dev/null
-      end
-      set args --worktree $filtered
-    else
-      set args $filtered
-    end
+    set args --worktree $args
   end
   if test "$auto_mode_flag" = "--enable-auto-mode"
     set args $auto_mode_flag $args
