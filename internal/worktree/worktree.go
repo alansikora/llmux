@@ -170,8 +170,21 @@ func Apply(workspacePath, sessionName string, applyMarker ...bool) error {
 		stashCreated = true
 	}
 
-	// Generate and apply diff
-	diff, err := runGit(workspacePath, "diff", "HEAD..."+session.Branch)
+	// Snapshot the session's full working state (committed + staged + unstaged)
+	// git add -N marks untracked files so they appear in diffs
+	runGit(session.Path, "add", "-N", ".") //nolint:errcheck
+	// git stash create returns a ref capturing everything, without side effects
+	stashOut, _ := runGit(session.Path, "stash", "create")
+	// Restore the session's original index state
+	runGit(session.Path, "reset") //nolint:errcheck
+
+	ref := strings.TrimSpace(stashOut)
+	if ref == "" {
+		ref = session.Branch // no uncommitted changes, use branch as-is
+	}
+
+	// Generate diff from main HEAD to the full snapshot
+	diff, err := runGit(workspacePath, "diff", "HEAD..."+ref)
 	if err != nil {
 		if stashCreated {
 			runGit(workspacePath, "stash", "pop") //nolint:errcheck
