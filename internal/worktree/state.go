@@ -43,11 +43,15 @@ func RemoveDiff(workspacePath string) {
 }
 
 func SaveState(workspacePath string, state ApplyState) error {
+	p := stateFile(workspacePath)
+	if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+		return err
+	}
 	data, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(stateFile(workspacePath), data, 0644)
+	return os.WriteFile(p, data, 0644)
 }
 
 func LoadState(workspacePath string) (*ApplyState, error) {

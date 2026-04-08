@@ -274,9 +274,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.deleteData.Confirm {
 				m.cfg.RemoveWorkspace(m.deleteTarget)
 				if err := config.Save(m.cfg); err != nil {
+					m.cfg.AddWorkspace(m.deleteTarget) // roll back
 					m.statusMsg = fmt.Sprintf("save error: %v", err)
-				}
-				if err := config.RemoveSessionDir(m.deleteTarget); err != nil {
+				} else if err := config.RemoveSessionDir(m.deleteTarget); err != nil {
 					m.statusMsg = fmt.Sprintf("remove session dir error: %v", err)
 				}
 			}

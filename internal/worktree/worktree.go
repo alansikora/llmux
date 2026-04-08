@@ -222,6 +222,12 @@ func Apply(workspacePath, sessionName string, applyMarker ...bool) error {
 		StashCreated: stashCreated,
 		AppliedAt:    time.Now(),
 	}); err != nil {
+		// Reverse the applied diff and clean up the orphaned diff file
+		reverseCmd := exec.Command("git", "apply", "--reverse")
+		reverseCmd.Dir = workspacePath
+		reverseCmd.Stdin = strings.NewReader(diff)
+		reverseCmd.Run() //nolint:errcheck
+		RemoveDiff(workspacePath)
 		return fmt.Errorf("saving state: %w", err)
 	}
 
