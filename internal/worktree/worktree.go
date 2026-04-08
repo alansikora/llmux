@@ -208,6 +208,11 @@ func Apply(workspacePath, sessionName string, applyMarker ...bool) error {
 
 	// Save diff for reverse-apply during unapply
 	if err := SaveDiff(workspacePath, diff); err != nil {
+		// Reverse the already-applied diff to avoid inconsistent state
+		reverseCmd := exec.Command("git", "apply", "--reverse")
+		reverseCmd.Dir = workspacePath
+		reverseCmd.Stdin = strings.NewReader(diff)
+		reverseCmd.Run() //nolint:errcheck
 		return fmt.Errorf("saving diff: %w", err)
 	}
 
@@ -238,9 +243,6 @@ func Unapply(workspacePath string) error {
 		return fmt.Errorf("no session is currently applied")
 	}
 
-	// Remove marker file if present
-	removeMarker(workspacePath)
-
 	// Reverse-apply the saved diff to undo only the applied changes,
 	// preserving any edits the user made after applying.
 	diff, err := LoadDiff(workspacePath)
@@ -263,6 +265,8 @@ func Unapply(workspacePath string) error {
 		return fmt.Errorf("reverse-apply failed (manual resolution needed): %s\n%s", applyErr, string(output))
 	}
 
+	// Remove marker and diff only after reverse-apply succeeds
+	removeMarker(workspacePath)
 	RemoveDiff(workspacePath)
 
 	// Pop stash if one was created

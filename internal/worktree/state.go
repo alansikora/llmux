@@ -23,7 +23,11 @@ func diffFile(workspacePath string) string {
 }
 
 func SaveDiff(workspacePath, diff string) error {
-	return os.WriteFile(diffFile(workspacePath), []byte(diff), 0644)
+	p := diffFile(workspacePath)
+	if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(p, []byte(diff), 0644)
 }
 
 func LoadDiff(workspacePath string) (string, error) {

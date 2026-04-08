@@ -273,8 +273,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.deleteForm.State == huh.StateCompleted {
 			if m.deleteData.Confirm {
 				m.cfg.RemoveWorkspace(m.deleteTarget)
-				config.Save(m.cfg)
-				config.RemoveSessionDir(m.deleteTarget)
+				if err := config.Save(m.cfg); err != nil {
+					m.statusMsg = fmt.Sprintf("save error: %v", err)
+				}
+				if err := config.RemoveSessionDir(m.deleteTarget); err != nil {
+					m.statusMsg = fmt.Sprintf("remove session dir error: %v", err)
+				}
 			}
 			m.state = stateWorkspaceList
 			m.refreshWorkspaceList()
@@ -433,7 +437,10 @@ func (m *Model) applyWsRename() {
 	}
 	if err := config.Save(m.cfg); err != nil {
 		// Roll back: rename session dir back, revert in-memory config
-		_ = config.RenameSessionDir(newName, oldName)
+		if rbErr := config.RenameSessionDir(newName, oldName); rbErr != nil {
+			m.statusMsg = fmt.Sprintf("save error and rollback failed — session dir is now %q: %v / %v", newName, err, rbErr)
+			return
+		}
 		_ = m.cfg.RenameWorkspace(newName, oldName)
 		m.statusMsg = fmt.Sprintf("save error: %v", err)
 		return
