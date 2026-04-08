@@ -36,7 +36,13 @@ func snippet(bin string) string {
     break
   done
   if [ -n "$_llmux_first_pos" ] && %s is-subcommand "$_llmux_first_pos" 2>/dev/null; then
-    command claude "$@"
+    local _llmux_pt_output
+    _llmux_pt_output="$(%s resolve "$(pwd -P)" -- "$@" 2>/dev/null)"
+    if [ $? -eq 0 ]; then
+      CLAUDE_CONFIG_DIR="$(echo "$_llmux_pt_output" | head -n1)" command claude "$@"
+    else
+      command claude "$@"
+    fi
     return
   fi
 
@@ -69,7 +75,7 @@ func snippet(bin string) string {
     args=("--worktree" "${args[@]}")
   fi
   CLAUDE_CONFIG_DIR="$config_dir" command claude "${args[@]}"
-}`, bin, bin, bin, bin)
+}`, bin, bin, bin, bin, bin)
 }
 
 func fishSnippet(bin string) string {
@@ -84,7 +90,12 @@ func fishSnippet(bin string) string {
     break
   end
   if test -n "$_llmux_first_pos"; and %s is-subcommand $_llmux_first_pos 2>/dev/null
-    command claude $argv
+    set -l _llmux_pt_output (string split \n (%s resolve (pwd -P) -- $argv 2>/dev/null))
+    if test $status -eq 0
+      CLAUDE_CONFIG_DIR=$_llmux_pt_output[1] command claude $argv
+    else
+      command claude $argv
+    end
     return
   end
 
@@ -118,7 +129,7 @@ func fishSnippet(bin string) string {
     set args --worktree $args
   end
   CLAUDE_CONFIG_DIR=$config_dir command claude $args
-end`, bin, bin, bin, bin)
+end`, bin, bin, bin, bin, bin)
 }
 
 const marker = "# llmux shell integration"
