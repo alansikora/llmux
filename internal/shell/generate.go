@@ -28,18 +28,17 @@ func snippet(bin string) string {
 	return fmt.Sprintf(`claude() {
   # Pass-through for non-interactive subcommands — bypass workspace resolution
   # entirely so these work even outside a configured workspace.
+  # The subcommand list is maintained in Go (llmux is-subcommand).
   local _llmux_first_pos=""
   for arg in "$@"; do
     [[ "$arg" == -* ]] && continue
     _llmux_first_pos="$arg"
     break
   done
-  case "$_llmux_first_pos" in
-    mcp|config|api-key|doctor|update|version)
-      command claude "$@"
-      return
-      ;;
-  esac
+  if [ -n "$_llmux_first_pos" ] && %s is-subcommand "$_llmux_first_pos" 2>/dev/null; then
+    command claude "$@"
+    return
+  fi
 
   local resolve_output config_dir extra_flags
   resolve_output="$(%s resolve "$(pwd -P)" -- "$@")"
@@ -70,24 +69,23 @@ func snippet(bin string) string {
     args=("--worktree" "${args[@]}")
   fi
   CLAUDE_CONFIG_DIR="$config_dir" command claude "${args[@]}"
-}`, bin, bin, bin)
+}`, bin, bin, bin, bin)
 }
 
 func fishSnippet(bin string) string {
 	return fmt.Sprintf(`function claude
   # Pass-through for non-interactive subcommands — bypass workspace resolution
   # entirely so these work even outside a configured workspace.
+  # The subcommand list is maintained in Go (llmux is-subcommand).
   set -l _llmux_first_pos ""
   for arg in $argv
     string match -q -- '-*' $arg; and continue
     set _llmux_first_pos $arg
     break
   end
-  if test -n "$_llmux_first_pos"
-    if contains -- $_llmux_first_pos mcp config api-key doctor update version
-      command claude $argv
-      return
-    end
+  if test -n "$_llmux_first_pos"; and %s is-subcommand $_llmux_first_pos 2>/dev/null
+    command claude $argv
+    return
   end
 
   set -l resolve_output (string split \n (%s resolve (pwd -P) -- $argv))
@@ -120,7 +118,7 @@ func fishSnippet(bin string) string {
     set args --worktree $args
   end
   CLAUDE_CONFIG_DIR=$config_dir command claude $args
-end`, bin, bin, bin)
+end`, bin, bin, bin, bin)
 }
 
 const marker = "# llmux shell integration"
