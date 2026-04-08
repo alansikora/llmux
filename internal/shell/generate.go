@@ -39,6 +39,20 @@ func snippet(bin string) string {
   fi
   config_dir="$(echo "$resolve_output" | head -n1)"
   extra_flags="$(echo "$resolve_output" | sed -n '2p')"
+
+  # Pass-through for non-interactive subcommands — skip worktree injection
+  local _llmux_passthrough_cmds=(mcp config api-key doctor update version)
+  local _llmux_first_pos=""
+  for arg in "$@"; do
+    [[ "$arg" == -* ]] && continue
+    _llmux_first_pos="$arg"
+    break
+  done
+  if [[ " ${_llmux_passthrough_cmds[*]} " == *" $_llmux_first_pos "* ]]; then
+    CLAUDE_CONFIG_DIR="$config_dir" command claude "$@"
+    return
+  fi
+
   local args=()
   for arg in "$@"; do
     if [ "$arg" = "--no-worktree" ] || [ "$arg" = "-nw" ]; then
@@ -75,6 +89,20 @@ func fishSnippet(bin string) string {
   if test (count $resolve_output) -ge 2
     set extra_flags $resolve_output[2]
   end
+
+  # Pass-through for non-interactive subcommands — skip worktree injection
+  set -l _llmux_passthrough_cmds mcp config api-key doctor update version
+  set -l _llmux_first_pos ""
+  for arg in $argv
+    string match -q -- '-*' $arg; and continue
+    set _llmux_first_pos $arg
+    break
+  end
+  if contains -- $_llmux_first_pos $_llmux_passthrough_cmds
+    CLAUDE_CONFIG_DIR=$config_dir command claude $argv
+    return
+  end
+
   set -l args
   for arg in $argv
     if test "$arg" = "--no-worktree" -o "$arg" = "-nw"
