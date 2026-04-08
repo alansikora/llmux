@@ -273,7 +273,20 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.deleteForm.State == huh.StateCompleted {
 			if m.deleteData.Confirm {
 				m.cfg.RemoveWorkspace(m.deleteTarget)
-				config.Save(m.cfg)
+				if err := config.Save(m.cfg); err != nil {
+					// Reload config from disk to restore the original state
+					if restored, loadErr := config.Load(); loadErr == nil {
+						m.cfg = restored
+					} else {
+						m.statusMsg = fmt.Sprintf("save error: %v; failed to reload config: %v", err, loadErr)
+						m.state = stateWorkspaceList
+						m.refreshWorkspaceList()
+						return m, nil
+					}
+					m.statusMsg = fmt.Sprintf("save error: %v", err)
+				} else if err := config.RemoveSessionDir(m.deleteTarget); err != nil {
+					m.statusMsg = fmt.Sprintf("remove session dir error: %v", err)
+				}
 			}
 			m.state = stateWorkspaceList
 			m.refreshWorkspaceList()
@@ -430,7 +443,16 @@ func (m *Model) applyWsRename() {
 		m.statusMsg = fmt.Sprintf("rename session dir error: %v", err)
 		return
 	}
-	config.Save(m.cfg)
+	if err := config.Save(m.cfg); err != nil {
+		// Roll back: rename session dir back, revert in-memory config
+		if rbErr := config.RenameSessionDir(newName, oldName); rbErr != nil {
+			m.statusMsg = fmt.Sprintf("save error and rollback failed — session dir is now %q: %v / %v", newName, err, rbErr)
+			return
+		}
+		_ = m.cfg.RenameWorkspace(newName, oldName)
+		m.statusMsg = fmt.Sprintf("save error: %v", err)
+		return
+	}
 	m.statusMsg = ""
 	if err := config.SyncWorkspaceSettings(m.cfg, newName); err != nil {
 		m.statusMsg = fmt.Sprintf("settings sync error: %v", err)

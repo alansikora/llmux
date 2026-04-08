@@ -18,12 +18,40 @@ func stateFile(workspacePath string) string {
 	return filepath.Join(workspacePath, ".claude", "worktrees", ".llmux-apply-state.json")
 }
 
+func diffFile(workspacePath string) string {
+	return filepath.Join(workspacePath, ".claude", "worktrees", ".llmux-apply-diff.patch")
+}
+
+func SaveDiff(workspacePath, diff string) error {
+	p := diffFile(workspacePath)
+	if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(p, []byte(diff), 0644)
+}
+
+func LoadDiff(workspacePath string) (string, error) {
+	data, err := os.ReadFile(diffFile(workspacePath))
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func RemoveDiff(workspacePath string) {
+	os.Remove(diffFile(workspacePath))
+}
+
 func SaveState(workspacePath string, state ApplyState) error {
+	p := stateFile(workspacePath)
+	if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+		return err
+	}
 	data, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(stateFile(workspacePath), data, 0644)
+	return os.WriteFile(p, data, 0644)
 }
 
 func LoadState(workspacePath string) (*ApplyState, error) {
