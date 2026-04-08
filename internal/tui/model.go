@@ -277,6 +277,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// Reload config from disk to restore the original state
 					if restored, loadErr := config.Load(); loadErr == nil {
 						m.cfg = restored
+					} else {
+						m.statusMsg = fmt.Sprintf("save error: %v; failed to reload config: %v", err, loadErr)
+						m.state = stateWorkspaceList
+						m.refreshWorkspaceList()
+						return m, nil
 					}
 					m.statusMsg = fmt.Sprintf("save error: %v", err)
 				} else if err := config.RemoveSessionDir(m.deleteTarget); err != nil {
