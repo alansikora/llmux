@@ -92,9 +92,8 @@ func fishSnippet(bin string) string {
   if test -n "$_llmux_first_pos"; and %s is-subcommand $_llmux_first_pos 2>/dev/null
     set -l _llmux_pt_raw (%s resolve (pwd -P) -- $argv 2>/dev/null)
     set -l _llmux_pt_status $status
-    set -l _llmux_pt_output (string split \n "$_llmux_pt_raw")
     if test $_llmux_pt_status -eq 0
-      CLAUDE_CONFIG_DIR=$_llmux_pt_output[1] command claude $argv
+      CLAUDE_CONFIG_DIR=$_llmux_pt_raw[1] command claude $argv
     else
       command claude $argv
     end
