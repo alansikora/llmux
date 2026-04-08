@@ -26,6 +26,26 @@ func rcFile(sh string) (string, error) {
 
 func snippet(bin string) string {
 	return fmt.Sprintf(`claude() {
+  # Pass-through for non-interactive subcommands — bypass workspace resolution
+  # entirely so these work even outside a configured workspace.
+  # The subcommand list is maintained in Go (llmux is-subcommand).
+  local _llmux_first_pos=""
+  for arg in "$@"; do
+    [[ "$arg" == -* ]] && continue
+    _llmux_first_pos="$arg"
+    break
+  done
+  if [ -n "$_llmux_first_pos" ] && %s is-subcommand "$_llmux_first_pos" 2>/dev/null; then
+    local _llmux_pt_output
+    _llmux_pt_output="$(%s resolve "$(pwd -P)" -- "$@" 2>/dev/null)"
+    if [ $? -eq 0 ]; then
+      CLAUDE_CONFIG_DIR="$(echo "$_llmux_pt_output" | head -n1)" command claude "$@"
+    else
+      command claude "$@"
+    fi
+    return
+  fi
+
   local resolve_output config_dir extra_flags
   resolve_output="$(%s resolve "$(pwd -P)" -- "$@")"
   local resolve_status=$?
@@ -55,11 +75,31 @@ func snippet(bin string) string {
     args=("--worktree" "${args[@]}")
   fi
   CLAUDE_CONFIG_DIR="$config_dir" command claude "${args[@]}"
-}`, bin, bin, bin)
+}`, bin, bin, bin, bin, bin)
 }
 
 func fishSnippet(bin string) string {
 	return fmt.Sprintf(`function claude
+  # Pass-through for non-interactive subcommands — bypass workspace resolution
+  # entirely so these work even outside a configured workspace.
+  # The subcommand list is maintained in Go (llmux is-subcommand).
+  set -l _llmux_first_pos ""
+  for arg in $argv
+    string match -q -- '-*' $arg; and continue
+    set _llmux_first_pos $arg
+    break
+  end
+  if test -n "$_llmux_first_pos"; and %s is-subcommand $_llmux_first_pos 2>/dev/null
+    set -l _llmux_pt_raw (%s resolve (pwd -P) -- $argv 2>/dev/null)
+    set -l _llmux_pt_status $status
+    if test $_llmux_pt_status -eq 0
+      CLAUDE_CONFIG_DIR=$_llmux_pt_raw[1] command claude $argv
+    else
+      command claude $argv
+    end
+    return
+  end
+
   set -l resolve_output (string split \n (%s resolve (pwd -P) -- $argv))
   set -l resolve_status $status
   if test $resolve_status -eq 2
@@ -90,7 +130,7 @@ func fishSnippet(bin string) string {
     set args --worktree $args
   end
   CLAUDE_CONFIG_DIR=$config_dir command claude $args
-end`, bin, bin, bin)
+end`, bin, bin, bin, bin, bin)
 }
 
 const marker = "# llmux shell integration"
