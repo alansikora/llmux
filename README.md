@@ -1,50 +1,26 @@
 # <img width="150" alt="llmux-icon" src="https://github.com/user-attachments/assets/dc16721e-b884-48d3-851b-1d481cb8c159" /> llmux
 
+[![GitHub release](https://img.shields.io/github/v/release/alansikora/llmux)](https://github.com/alansikora/llmux/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A workspace manager for AI coding assistants. Currently supports [Claude Code](https://docs.anthropic.com/en/docs/claude-code), with more CLIs planned. Run multiple isolated sessions — each workspace gets its own authentication, settings, and history.
+Workspace manager for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Run multiple isolated sessions — each project gets its own authentication, settings, and history. No manual env vars, no wrapper scripts.
 
-## Why
+<!-- TODO: add a GIF/screenshot of the TUI here -->
 
-Claude Code stores everything in `~/.claude`. If you work across multiple projects, they all share the same session. llmux gives each project its own `CLAUDE_CONFIG_DIR`, so you get:
-
-- **Isolated sessions** — separate auth, history, and settings per project
-- **Automatic routing** — `claude` just works based on your current directory
-- **Zero friction** — no manual env vars, no wrapper scripts
-
-## Features
-
-- **Workspaces & projects** — workspaces hold auth and default settings; projects map directories to workspaces with optional per-project overrides
-- **Automatic routing** — `claude` resolves the right workspace based on your current directory
-- **Auto-registration** — run `claude` in an unregistered directory and get prompted to pick a workspace
-- **Default workspace** — set a fallback workspace for directories without a match
-- **Per-workspace API keys** — use different Anthropic API keys per project
-- **Worktree mode** — auto-pass `--worktree` to Claude per workspace or project, bypass with `--no-worktree` / `-nw`
-- **Worktree session management** — list, apply, revert, and resume Claude worktree sessions
-- **Session resume** — resume a worktree session by name or branch with `llmux resume`
-- **Slash commands** — `/llmux apply` and `/llmux unapply` available inside Claude Code sessions
-- **Auto mode** — globally pass `--enable-auto-mode` to Claude Code
-- **Status line** — enable [ccstatusline](https://github.com/sirmalloc/ccstatusline) across all workspaces, showing model, context, and git info in Claude Code
-- **Disable attributions** — remove "Made with Claude Code" from commits and PRs per workspace
-- **Auto-update** — `llmux upgrade` checks GitHub releases and upgrades in place, with update notices in the TUI
-- **Short alias** — optionally define `c` as a shorthand for `claude`
-- **TUI manager** — add, configure, and manage workspaces, projects, and sessions interactively
-- **Shell integration** — supports zsh, bash, and fish
-
-## Install
+## Quick start
 
 ```bash
+# Install
 curl -fsSL https://raw.githubusercontent.com/alansikora/llmux/main/install.sh | sh
+
+# Set up your shell
+llmux init zsh   # or bash / fish
+
+# Restart your shell, then launch the TUI
+llmux
 ```
 
-Then set up shell integration:
-
-```bash
-llmux init zsh    # writes to ~/.zshrc
-llmux init bash   # writes to ~/.bashrc
-llmux init fish   # writes to ~/.config/fish/config.fish
-```
-
-Restart your shell, and you're done.
+From the TUI: create a workspace, add a project directory, and you're done. Run `claude` anywhere and llmux handles the rest.
 
 <details>
 <summary>Other install methods</summary>
@@ -52,7 +28,7 @@ Restart your shell, and you're done.
 **With Go:**
 
 ```bash
-go install github.com/allskar/llmux@latest
+go install github.com/alansikora/llmux@latest
 ```
 
 **From source:**
@@ -77,6 +53,45 @@ curl -fsSL https://raw.githubusercontent.com/alansikora/llmux/main/install.sh | 
 
 </details>
 
+## Why
+
+Claude Code stores everything in `~/.claude`. If you work across multiple projects — personal repos, work repos, client projects — they all share the same session, API key, and settings. llmux gives each project its own `CLAUDE_CONFIG_DIR`, so you get full isolation with zero friction.
+
+## Features
+
+### Workspaces and routing
+
+- **Isolated sessions** — each workspace gets its own auth, history, settings, and API key
+- **Automatic routing** — a thin shell wrapper resolves the right workspace based on your current directory. Register a parent directory and all subdirectories inherit it; register a more specific child path and it gets its own workspace while siblings keep the parent's
+- **Auto-registration** — run `claude` in an unregistered directory and get prompted to pick a workspace
+- **Default workspace** — set a fallback for directories that don't match any project
+- **Subcommand passthrough** — `claude mcp`, `claude config`, etc. bypass workspace resolution and work natively
+
+### Worktree sessions
+
+When a workspace has **Always use worktree** enabled, Claude Code runs in an isolated git worktree under `.claude/worktrees/`. This keeps your main branch clean while Claude works on a separate branch.
+
+- **Apply and unapply** — bring session changes into your main workspace as uncommitted diffs, then cleanly revert them
+- **Full working-state capture** — apply picks up committed, staged, _and_ unstaged changes (including untracked files)
+- **3-way merge** — conflicts during apply are handled gracefully via `git apply --3way`
+- **Safe with dirty trees** — if your working tree has uncommitted changes, llmux auto-stashes before apply and restores on unapply
+- **Diff-based unapply** — reversal uses a saved diff, so edits you make after applying are preserved
+- **Stale detection** — sessions older than 7 days are marked as stale in the TUI
+- **Resume** — resume any session by name or branch without manually navigating to the worktree
+- **Auto-fetch** — worktree mode fetches `origin/<default-branch>` before launching Claude, so worktrees start from an up-to-date base
+- **Slash commands** — `/llmux apply` and `/llmux unapply` work directly inside Claude Code sessions
+
+### Customization
+
+- **Per-workspace API keys** — use different Anthropic API keys per project
+- **Disable attributions** — remove "Made with Claude Code" from commits and PRs (per workspace or per project)
+- **Auto mode** — globally pass `--enable-auto-mode` to Claude Code
+- **Status line** — enable [ccstatusline](https://github.com/sirmalloc/ccstatusline) showing model, context, and git info
+- **Apply marker** — drop a `.llmux-applied` file when a session is applied (visible in `git status`)
+- **Short alias** — optionally define `c` as a shorthand for `claude`
+- **Project overrides** — override any workspace default (worktree, attributions) per project directory
+- **Auto-update** — `llmux upgrade` checks GitHub releases and upgrades in place, with update notices in the TUI
+
 ## Usage
 
 ### TUI
@@ -85,122 +100,48 @@ curl -fsSL https://raw.githubusercontent.com/alansikora/llmux/main/install.sh | 
 llmux
 ```
 
-Opens an interactive manager. The TUI has three levels: workspaces → projects → sessions.
+Opens an interactive manager with three levels: **workspaces → projects → sessions**. Press `?` or see the on-screen help for keybindings.
 
-**Workspace list:**
+See [USAGE.md](USAGE.md) for the full keybindings reference.
 
-| Key | Action |
-|-----|--------|
-| `enter` | View projects |
-| `a` | Add workspace |
-| `e` | Edit workspace options |
-| `o` | General options |
-| `s` | Toggle default workspace (shown with ★) |
-| `d` / `x` | Delete workspace |
-| `esc` | Quit |
-
-**Project list** (inside a workspace):
-
-| Key | Action |
-|-----|--------|
-| `enter` | View worktree sessions |
-| `a` | Add project |
-| `e` | Edit project overrides |
-| `d` / `x` | Remove project |
-| `esc` | Back to workspaces |
-
-### Default workspace
-
-Press `s` to set a workspace as the default. When you run `claude` from a directory that doesn't match any workspace, the default is used instead of erroring.
-
-### Workspace options
-
-Press `e` on a workspace to configure defaults that apply to all its projects:
-
-- **Disable attributions** — removes "Made with Claude Code" from commits and PRs
-- **Always use worktree** — automatically passes `--worktree` to Claude. Bypass for a single session with `claude --no-worktree` (or `-nw`)
-
-### Project overrides
-
-Press `e` on a project to override workspace defaults for that directory. Settings can be set to **inherit** (use workspace default), **enabled**, or **disabled**.
-
-### Worktree sessions
-
-When Claude Code runs with `--worktree`, it creates a git worktree under `.claude/worktrees/` with changes on a separate branch. Use these commands to manage those sessions:
+### CLI
 
 ```bash
-llmux sessions              # list worktree sessions for the current project
-llmux resume <name>         # resume a session by name or branch (launches claude --continue)
-llmux apply [session]       # apply session changes as uncommitted diffs on main
-llmux unapply               # revert applied changes (restores any auto-stashed state)
+llmux                       # open the TUI manager
+llmux list                  # list all workspaces and projects with auth status
+llmux sessions [workspace]  # list worktree sessions for the current project
+llmux resume <name>         # resume a session by name or branch
+llmux apply [session]       # apply session changes to main (-w to specify workspace)
+llmux unapply               # revert applied changes
+llmux upgrade               # upgrade to the latest version
+llmux init <shell> [--print]  # set up shell integration (or print without installing)
 ```
 
-`llmux resume` finds the worktree, sets up the workspace environment, and launches Claude directly inside it — no need to manually `cd` or pass `--no-worktree`.
-
-`llmux apply` auto-detects the session name when run from inside a worktree. Changes are applied as uncommitted modifications — no merge commits. If your working tree is dirty, llmux auto-stashes first and restores on `unapply`.
-
-You can also browse and manage sessions from the TUI (workspace → project → `enter`):
-
-| Key | Action |
-|-----|--------|
-| `a` / `enter` | Apply session |
-| `u` | Unapply current session |
-| `c` | Copy worktree path to clipboard |
-| `d` | Delete session |
-| `esc` | Back to project list |
-
-### Slash commands
-
-llmux installs Claude Code slash commands during `llmux init`:
-
-- `/llmux apply` — apply the current worktree session's changes to the main workspace
-- `/llmux unapply` — revert previously applied changes
-
-These work inside any Claude Code session, including worktree sessions. The shell wrapper automatically skips adding `--worktree` when you use `--resume` or `--continue`, so resuming existing sessions works without needing `--no-worktree`.
-
-### General options
-
-Press `o` to configure global settings:
-
-- **Short alias** — defines `c` as a shorthand for `claude` (requires shell restart to take effect)
-- **Apply marker** — creates a `.llmux-applied` file in the workspace root when a session is applied (makes it visible in `git status`)
-- **Auto mode** — passes `--enable-auto-mode` to Claude Code, allowing it to run without confirmation prompts
-- **Status line** — enables [ccstatusline](https://github.com/sirmalloc/ccstatusline) across all workspaces. When enabled, the status line config is automatically added to every workspace's `settings.json` (including newly created workspaces). Disable to remove from all workspaces.
-
-### CLI commands
-
-```bash
-llmux                   # open the TUI manager
-llmux list              # list all workspaces and projects with auth status
-llmux sessions          # list worktree sessions for the current project
-llmux resume <name>     # resume a worktree session by name or branch
-llmux apply [session]   # apply worktree session changes to main
-llmux unapply           # revert applied changes
-llmux upgrade           # upgrade to the latest version
-llmux init zsh --print  # print the shell function without installing
-```
+`llmux apply` auto-detects the session when run from inside a worktree. Pass `--no-worktree` (or `-nw`) to skip worktree mode for a single `claude` invocation. `--resume`, `--continue`, `-r`, and `-c` also bypass worktree injection automatically.
 
 ### How it works
 
-After running `llmux init zsh`, your shell has a thin `claude()` wrapper that calls `llmux resolve` when you run `claude` in any directory. The resolve command finds the matching workspace using longest-prefix path matching against registered projects, and returns the session directory, API key, worktree flag, and auto-mode flag.
+After `llmux init`, your shell has a thin `claude()` wrapper. When you run `claude`, it calls `llmux resolve` to find the matching workspace using longest-prefix path matching, then launches Claude Code with the right `CLAUDE_CONFIG_DIR`, API key, and flags.
 
-If the directory isn't registered to any workspace, the wrapper triggers `llmux register` to let you interactively pick a workspace.
+Claude subcommands (like `claude mcp add`) are detected and passed through directly — no workspace resolution overhead. The subcommand list is cached locally with a 24-hour TTL.
 
-If the resolved project has **Always use worktree** enabled, the wrapper also runs `git fetch origin <default-branch>` before launching Claude — so the worktree is always based on an up-to-date branch. The fetch is a best-effort no-op if there's no remote, no network, or `origin/HEAD` isn't set. Pass `--no-worktree` (or `-nw`) to skip both the fetch and the worktree for a single session.
-
-Workspaces and sessions are stored in `~/.config/llmux/` (overridable via `LLMUX_CONFIG_DIR`):
+Config is stored in `~/.config/llmux/` (override with `LLMUX_CONFIG_DIR`):
 
 ```
 ~/.config/llmux/
 ├── config.json              # workspace + project definitions
 └── sessions/
-    ├── myapp/               # CLAUDE_CONFIG_DIR for "myapp" workspace
+    ├── myapp/               # CLAUDE_CONFIG_DIR for "myapp"
     │   ├── .credentials.json
     │   └── settings.json
     └── backend/
         ├── .credentials.json
         └── settings.json
 ```
+
+## Shell support
+
+Supports **zsh**, **bash**, and **fish**. The generated wrapper is intentionally minimal — all logic lives in the Go binary.
 
 ## License
 
