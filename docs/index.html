@@ -9,30 +9,10 @@
   <meta property="og:description" content="Run multiple isolated Claude Code sessions. Each workspace gets its own auth, settings, and history." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://llmux.sh" />
-  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:card" content="summary" />
   <link rel="canonical" href="https://llmux.sh" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>%E2%9A%A1</text></svg>" />
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            bg: '#0a0a0a',
-            surface: '#141414',
-            border: '#262626',
-            muted: '#737373',
-            accent: '#c084fc',
-            'accent-dim': '#7c3aed',
-          },
-          fontFamily: {
-            mono: ['"SF Mono"', '"Fira Code"', '"JetBrains Mono"', 'Menlo', 'monospace'],
-            sans: ['"Inter"', 'system-ui', 'sans-serif'],
-          },
-        },
-      },
-    }
-  </script>
+  <link rel="stylesheet" href="style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -69,7 +49,9 @@
       background-size: 200% 100%;
       animation: shimmer 3s linear infinite;
       -webkit-background-clip: text;
+      background-clip: text;
       -webkit-text-fill-color: transparent;
+      color: transparent;
     }
 
     .terminal {
