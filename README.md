@@ -62,6 +62,7 @@ Claude Code stores everything in `~/.claude`. If you work across multiple projec
 ### Workspaces and routing
 
 - **Isolated sessions** — each workspace gets its own auth, history, settings, and API key
+- **Workspace-scoped insights** — `/insights` uses your conversation history, and since each workspace has its own, you get project-specific insights automatically. Same Anthropic account, specialized intelligence per project
 - **Automatic routing** — a thin shell wrapper resolves the right workspace based on your current directory. Register a parent directory and all subdirectories inherit it; register a more specific child path and it gets its own workspace while siblings keep the parent's
 - **Auto-registration** — run `claude` in an unregistered directory and get prompted to pick a workspace
 - **Default workspace** — set a fallback for directories that don't match any project
