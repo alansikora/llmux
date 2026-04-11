@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>llmux - Workspace Manager for Claude Code</title>
+  <meta name="description" content="Run multiple isolated Claude Code sessions. Each workspace gets its own auth, settings, and history. Zero friction, automatic routing." />
+  <meta property="og:title" content="llmux - Workspace Manager for Claude Code" />
+  <meta property="og:description" content="Run multiple isolated Claude Code sessions. Each workspace gets its own auth, settings, and history." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://llmux.sh" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="canonical" href="https://llmux.sh" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>%E2%9A%A1</text></svg>" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bg: '#0a0a0a',
+            surface: '#141414',
+            border: '#262626',
+            muted: '#737373',
+            accent: '#c084fc',
+            'accent-dim': '#7c3aed',
+          },
+          fontFamily: {
+            mono: ['"SF Mono"', '"Fira Code"', '"JetBrains Mono"', 'Menlo', 'monospace'],
+            sans: ['"Inter"', 'system-ui', 'sans-serif'],
+          },
+        },
+      },
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body { background: #0a0a0a; }
+
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up {
+      animation: fade-up 0.6s ease-out both;
+    }
+    .fade-up-1 { animation-delay: 0.1s; }
+    .fade-up-2 { animation-delay: 0.2s; }
+    .fade-up-3 { animation-delay: 0.3s; }
+    .fade-up-4 { animation-delay: 0.4s; }
+    .fade-up-5 { animation-delay: 0.5s; }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+    .cursor-blink {
+      animation: blink 1s step-end infinite;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    .shimmer {
+      background: linear-gradient(90deg, #c084fc 0%, #e879f9 50%, #c084fc 100%);
+      background-size: 200% 100%;
+      animation: shimmer 3s linear infinite;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .terminal {
+      background: #0d0d0d;
+      border: 1px solid #262626;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .terminal-bar {
+      background: #171717;
+      border-bottom: 1px solid #262626;
+      padding: 10px 16px;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .terminal-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .feature-card {
+      background: #141414;
+      border: 1px solid #262626;
+      border-radius: 12px;
+      padding: 24px;
+      transition: border-color 0.2s;
+    }
+    .feature-card:hover {
+      border-color: #404040;
+    }
+  </style>
+</head>
+<body class="font-sans text-white antialiased">
+
+  <!-- Hero -->
+  <section class="pt-20 pb-20 px-6">
+    <div class="max-w-3xl mx-auto text-center">
+      <p class="fade-up fade-up-1 font-mono font-bold text-2xl mb-6 tracking-tight">llmux</p>
+      <p class="fade-up fade-up-1 text-sm font-mono text-accent mb-4 tracking-wide uppercase">Workspace Manager for Claude Code</p>
+      <h1 class="fade-up fade-up-2 text-4xl sm:text-5xl md:text-6xl font-bold leading-tight tracking-tight mb-6">
+        One machine.<br/><span class="shimmer">Many workspaces.</span>
+      </h1>
+      <p class="fade-up fade-up-3 text-lg text-muted max-w-xl mx-auto mb-10">
+        Isolated auth, settings, and history per project. Automatic routing based on your directory. Just run <code class="font-mono text-white/80">claude</code> and it works.
+      </p>
+      <div class="fade-up fade-up-4 flex flex-col sm:flex-row items-center justify-center gap-4">
+        <a href="#install" class="inline-flex items-center gap-2 bg-accent hover:bg-accent/90 text-white font-medium px-6 py-3 rounded-lg transition-colors text-sm">
+          Get started
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+        </a>
+        <a href="https://github.com/alansikora/llmux" class="inline-flex items-center gap-2 border border-border hover:border-muted text-muted hover:text-white font-medium px-6 py-3 rounded-lg transition-colors text-sm">
+          View on GitHub
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Terminal demo -->
+  <section class="pb-24 px-6">
+    <div class="max-w-2xl mx-auto fade-up fade-up-5">
+      <div class="terminal shadow-2xl shadow-accent/5">
+        <div class="terminal-bar">
+          <div class="terminal-dot bg-[#ff5f57]"></div>
+          <div class="terminal-dot bg-[#febc2e]"></div>
+          <div class="terminal-dot bg-[#28c840]"></div>
+          <span class="ml-3 text-xs text-muted font-mono">Terminal</span>
+        </div>
+        <div class="p-5 font-mono text-sm leading-relaxed">
+          <div class="text-muted">
+            <span class="text-green-400">~</span> $ curl -fsSL https://llmux.sh/install | sh
+          </div>
+          <div class="text-muted mt-1">
+            <span class="text-green-400">~</span> $ llmux init zsh
+          </div>
+          <div class="text-emerald-400 mt-1">
+            Shell integration installed. Restart your shell.
+          </div>
+          <div class="mt-3 text-muted">
+            <span class="text-green-400">~</span> $ llmux
+          </div>
+          <div class="mt-1">
+            <span class="text-accent">?</span> Workspaces
+          </div>
+          <div class="text-white/90">
+            &nbsp;&nbsp;<span class="text-accent">></span> personal <span class="text-muted">~/projects</span>
+          </div>
+          <div class="text-white/60">
+            &nbsp;&nbsp;&nbsp;&nbsp;work <span class="text-muted">~/work</span> <span class="text-yellow-500/80">★</span>
+          </div>
+          <div class="text-white/60">
+            &nbsp;&nbsp;&nbsp;&nbsp;client <span class="text-muted">~/client</span>
+          </div>
+          <div class="mt-3 text-muted">
+            <span class="text-green-400">~/work/api</span> $ claude<span class="cursor-blink text-white">_</span>
+          </div>
+          <div class="text-muted text-xs mt-1">
+            # resolves to "work" workspace automatically
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features" class="pb-24 px-6">
+    <div class="max-w-5xl mx-auto">
+      <h2 class="text-2xl sm:text-3xl font-bold text-center mb-4 tracking-tight">Everything you need</h2>
+      <p class="text-muted text-center mb-12 max-w-lg mx-auto">Each workspace is a fully isolated Claude Code environment. Switch projects, not accounts.</p>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="feature-card">
+          <div class="text-accent text-xl mb-3">&#x2192;</div>
+          <h3 class="font-semibold mb-2">Automatic routing</h3>
+          <p class="text-sm text-muted">Run <code class="font-mono text-white/70">claude</code> anywhere. llmux resolves the right workspace from your current directory using longest-prefix matching.</p>
+        </div>
+        <div class="feature-card">
+          <div class="text-accent text-xl mb-3">&#x1F512;</div>
+          <h3 class="font-semibold mb-2">Isolated sessions</h3>
+          <p class="text-sm text-muted">Separate auth, history, and settings per workspace. Each gets its own <code class="font-mono text-white/70">CLAUDE_CONFIG_DIR</code>.</p>
+        </div>
+        <div class="feature-card">
+          <div class="text-accent text-xl mb-3">&#x1F333;</div>
+          <h3 class="font-semibold mb-2">Worktree sessions</h3>
+          <p class="text-sm text-muted">Auto-pass <code class="font-mono text-white/70">--worktree</code> per workspace. List, apply, revert, and resume sessions from the TUI or CLI.</p>
+        </div>
+        <div class="feature-card">
+          <div class="text-accent text-xl mb-3">&#x1F511;</div>
+          <h3 class="font-semibold mb-2">Separate accounts</h3>
+          <p class="text-sm text-muted">Use different subscriptions and API keys per workspace. Personal account for side projects, work account for the day job.</p>
+        </div>
+        <div class="feature-card">
+          <div class="text-accent text-xl mb-3">&#x2328;</div>
+          <h3 class="font-semibold mb-2">Interactive TUI</h3>
+          <p class="text-sm text-muted">Manage workspaces, projects, options, and worktree sessions from a clean terminal UI.</p>
+        </div>
+        <div class="feature-card">
+          <div class="text-accent text-xl mb-3">&#x1F41A;</div>
+          <h3 class="font-semibold mb-2">Shell integration</h3>
+          <p class="text-sm text-muted">Supports zsh, bash, and fish. A thin <code class="font-mono text-white/70">claude()</code> wrapper handles everything behind the scenes.</p>
+        </div>
+        <div class="feature-card">
+          <div class="text-accent text-xl mb-3">&#x26A1;</div>
+          <h3 class="font-semibold mb-2">Zero friction</h3>
+          <p class="text-sm text-muted">No manual env vars, no wrapper scripts. Run <code class="font-mono text-white/70">claude</code> in an unregistered directory and pick a workspace on the spot.</p>
+        </div>
+        <div class="feature-card">
+          <div class="text-accent text-xl mb-3">&#x2F;</div>
+          <h3 class="font-semibold mb-2">Slash commands</h3>
+          <p class="text-sm text-muted">Apply or revert worktree changes without leaving Claude Code. <code class="font-mono text-white/70">/llmux apply</code> brings your session's changes into the main workspace as uncommitted diffs.</p>
+        </div>
+        <div class="feature-card">
+          <div class="text-accent text-xl mb-3">&#x2191;</div>
+          <h3 class="font-semibold mb-2">Auto-update</h3>
+          <p class="text-sm text-muted"><code class="font-mono text-white/70">llmux upgrade</code> checks GitHub releases and upgrades in place. The TUI shows update notices.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Install -->
+  <section id="install" class="pb-24 px-6">
+    <div class="max-w-2xl mx-auto">
+      <h2 class="text-2xl sm:text-3xl font-bold text-center mb-4 tracking-tight">Get started in seconds</h2>
+      <p class="text-muted text-center mb-10">One command to install, one to set up your shell.</p>
+
+      <div class="terminal shadow-2xl shadow-accent/5">
+        <div class="terminal-bar">
+          <div class="terminal-dot bg-[#ff5f57]"></div>
+          <div class="terminal-dot bg-[#febc2e]"></div>
+          <div class="terminal-dot bg-[#28c840]"></div>
+          <span class="ml-3 text-xs text-muted font-mono">Install</span>
+        </div>
+        <div class="p-5 font-mono text-sm leading-relaxed space-y-4">
+          <div>
+            <div class="text-muted text-xs mb-1"># Install llmux</div>
+            <div class="flex items-center gap-2">
+              <span class="text-white select-all">curl -fsSL https://llmux.sh/install | sh</span>
+            </div>
+          </div>
+          <div>
+            <div class="text-muted text-xs mb-1"># Set up shell integration (pick your shell)</div>
+            <div class="text-white select-all">llmux init zsh</div>
+          </div>
+          <div>
+            <div class="text-muted text-xs mb-1"># Restart your shell, then launch the TUI</div>
+            <div class="text-white select-all">llmux</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="pb-24 px-6">
+    <div class="max-w-3xl mx-auto">
+      <h2 class="text-2xl sm:text-3xl font-bold text-center mb-12 tracking-tight">How it works</h2>
+      <div class="space-y-8">
+        <div class="flex gap-4">
+          <div class="flex-shrink-0 w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center text-sm font-bold">1</div>
+          <div>
+            <h3 class="font-semibold mb-1">Create workspaces</h3>
+            <p class="text-sm text-muted">Each workspace gets its own Claude config directory under <code class="font-mono text-white/70">~/.config/llmux/sessions/</code> with separate auth and settings.</p>
+          </div>
+        </div>
+        <div class="flex gap-4">
+          <div class="flex-shrink-0 w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center text-sm font-bold">2</div>
+          <div>
+            <h3 class="font-semibold mb-1">Map projects to workspaces</h3>
+            <p class="text-sm text-muted">Register directories to workspaces. <code class="font-mono text-white/70">~/work/api</code> goes to "work", <code class="font-mono text-white/70">~/personal</code> goes to "personal".</p>
+          </div>
+        </div>
+        <div class="flex gap-4">
+          <div class="flex-shrink-0 w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center text-sm font-bold">3</div>
+          <div>
+            <h3 class="font-semibold mb-1">Just run <code class="font-mono">claude</code></h3>
+            <p class="text-sm text-muted">The shell wrapper calls <code class="font-mono text-white/70">llmux resolve</code>, finds the right workspace by longest-prefix match, and launches Claude with the correct config.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="border-t border-border py-10 px-6">
+    <div class="max-w-5xl mx-auto flex items-center justify-center">
+      <a href="https://github.com/alansikora/llmux" class="text-sm text-muted hover:text-white transition-colors flex items-center gap-1.5">
+        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        GitHub
+      </a>
+    </div>
+  </footer>
+
+</body>
+</html>
