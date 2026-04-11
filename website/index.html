@@ -11,7 +11,8 @@
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://llmux.sh" />
   <meta property="og:site_name" content="llmux" />
-  <meta name="twitter:card" content="summary_large_image" />
+  <!-- TODO: upgrade to summary_large_image once og:image / twitter:image are added -->
+  <meta name="twitter:card" content="summary" />
   <meta name="twitter:title" content="llmux - Workspace Manager for Claude Code" />
   <meta name="twitter:description" content="Isolated Claude Code sessions per project. Separate auth, settings, worktree sessions. Open source CLI." />
   <link rel="canonical" href="https://llmux.sh" />
@@ -349,6 +350,13 @@
       <h2 class="text-2xl sm:text-3xl font-bold text-center mb-12 tracking-tight">Frequently asked questions</h2>
       <div class="space-y-6">
         <details class="group" open>
+          <summary class="cursor-pointer font-semibold text-white/90 flex items-center gap-2">
+            <svg class="w-4 h-4 text-accent transition-transform group-open:rotate-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            What is llmux?
+          </summary>
+          <p class="text-sm text-muted mt-3 ml-6">llmux is an open-source workspace manager for Claude Code that lets you run multiple isolated sessions. Each workspace gets its own authentication, settings, history, and API keys. It automatically routes to the correct workspace based on your current directory.</p>
+        </details>
+        <details class="group">
           <summary class="cursor-pointer font-semibold text-white/90 flex items-center gap-2">
             <svg class="w-4 h-4 text-accent transition-transform group-open:rotate-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
             How do I use multiple Claude Code accounts on one machine?

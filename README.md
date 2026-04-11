@@ -42,7 +42,7 @@ go build -o llmux .
 **Custom install directory** (default: `~/.local/bin`)**:**
 
 ```bash
-INSTALL_DIR=/usr/local/bin curl -fsSL https://raw.githubusercontent.com/alansikora/llmux/main/install.sh | sudo sh
+INSTALL_DIR=/usr/local/bin curl -fsSL https://llmux.sh/install | sudo sh
 ```
 
 **Canary (latest from `main`):**
