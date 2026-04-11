@@ -3,14 +3,82 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>llmux - Workspace Manager for Claude Code</title>
-  <meta name="description" content="Run multiple isolated Claude Code sessions. Each workspace gets its own auth, settings, and history. Zero friction, automatic routing." />
+  <title>llmux - Workspace Manager for Claude Code | Isolated Sessions, Auth & Settings per Project</title>
+  <meta name="description" content="llmux is a workspace manager for Claude Code. Run multiple isolated sessions with separate auth, settings, history, and API keys per project. Automatic routing, git worktree sessions, interactive TUI. Open source CLI for macOS and Linux." />
+  <meta name="keywords" content="claude code, workspace manager, claude code sessions, claude code worktree, claude code multiple accounts, claude code CLI, AI coding tool, claude code workspace, session manager, llmux" />
   <meta property="og:title" content="llmux - Workspace Manager for Claude Code" />
-  <meta property="og:description" content="Run multiple isolated Claude Code sessions. Each workspace gets its own auth, settings, and history." />
+  <meta property="og:description" content="Run multiple isolated Claude Code sessions with separate auth, settings, and history per project. Open source CLI with automatic routing and git worktree support." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://llmux.sh" />
-  <meta name="twitter:card" content="summary" />
+  <meta property="og:site_name" content="llmux" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="llmux - Workspace Manager for Claude Code" />
+  <meta name="twitter:description" content="Isolated Claude Code sessions per project. Separate auth, settings, worktree sessions. Open source CLI." />
   <link rel="canonical" href="https://llmux.sh" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "llmux",
+    "url": "https://llmux.sh",
+    "description": "Workspace manager for Claude Code. Run multiple isolated sessions with separate auth, settings, and history per project.",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "macOS, Linux",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "license": "https://opensource.org/licenses/MIT",
+    "codeRepository": "https://github.com/alansikora/llmux",
+    "programmingLanguage": "Go",
+    "author": {
+      "@type": "Person",
+      "name": "Alan Sikora",
+      "url": "https://github.com/alansikora"
+    }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What is llmux?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "llmux is an open-source workspace manager for Claude Code that lets you run multiple isolated sessions. Each workspace gets its own authentication, settings, history, and API keys. It automatically routes to the correct workspace based on your current directory."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How do I use multiple Claude Code accounts on one machine?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Install llmux and create separate workspaces for each account. Each workspace gets its own CLAUDE_CONFIG_DIR with independent authentication. Map your project directories to workspaces, and llmux automatically routes claude commands to the correct account based on where you are in your filesystem."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How do I install llmux?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Run 'curl -fsSL https://llmux.sh/install | sh' to install, then 'llmux init zsh' (or bash/fish) to set up shell integration. Restart your shell and run 'llmux' to open the interactive TUI."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does llmux support git worktree sessions?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. llmux can auto-pass --worktree per workspace. You can list, apply, revert, and resume worktree sessions from the TUI or CLI. The /llmux apply slash command brings a session's changes into the main workspace as uncommitted diffs."
+        }
+      }
+    ]
+  }
+  </script>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>%E2%9A%A1</text></svg>" />
   <link rel="stylesheet" href="style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -271,6 +339,50 @@
             <p class="text-sm text-muted">The shell wrapper calls <code class="font-mono text-white/70">llmux resolve</code>, finds the right workspace by longest-prefix match, and launches Claude with the correct config.</p>
           </div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" class="pb-24 px-6">
+    <div class="max-w-3xl mx-auto">
+      <h2 class="text-2xl sm:text-3xl font-bold text-center mb-12 tracking-tight">Frequently asked questions</h2>
+      <div class="space-y-6">
+        <details class="group" open>
+          <summary class="cursor-pointer font-semibold text-white/90 flex items-center gap-2">
+            <svg class="w-4 h-4 text-accent transition-transform group-open:rotate-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            How do I use multiple Claude Code accounts on one machine?
+          </summary>
+          <p class="text-sm text-muted mt-3 ml-6">Create separate workspaces in llmux, each with its own authentication. Map your project directories to workspaces — for example, <code class="font-mono text-white/70">~/work</code> uses your company subscription and <code class="font-mono text-white/70">~/personal</code> uses your personal account. When you run <code class="font-mono text-white/70">claude</code>, llmux automatically resolves the correct workspace and auth based on your current directory.</p>
+        </details>
+        <details class="group">
+          <summary class="cursor-pointer font-semibold text-white/90 flex items-center gap-2">
+            <svg class="w-4 h-4 text-accent transition-transform group-open:rotate-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            How is llmux different from Claude Squad, Nimbalyst, or CCManager?
+          </summary>
+          <p class="text-sm text-muted mt-3 ml-6">llmux is not a session multiplexer or GUI wrapper — it's a workspace manager. The core problem it solves is isolation: separate auth, API keys, settings, history, and CLAUDE.md per project. Tools like Claude Squad focus on running multiple sessions in parallel via tmux. llmux operates at a lower level, routing every <code class="font-mono text-white/70">claude</code> invocation to the right isolated config directory. You can use llmux alongside those tools.</p>
+        </details>
+        <details class="group">
+          <summary class="cursor-pointer font-semibold text-white/90 flex items-center gap-2">
+            <svg class="w-4 h-4 text-accent transition-transform group-open:rotate-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            Does it work with worktree sessions?
+          </summary>
+          <p class="text-sm text-muted mt-3 ml-6">Yes. llmux can auto-pass <code class="font-mono text-white/70">--worktree</code> per workspace, so every Claude session runs in its own isolated git worktree. You can list, apply, revert, and resume worktree sessions from the TUI or CLI. The <code class="font-mono text-white/70">/llmux apply</code> slash command merges a session's changes back to the main workspace as uncommitted diffs.</p>
+        </details>
+        <details class="group">
+          <summary class="cursor-pointer font-semibold text-white/90 flex items-center gap-2">
+            <svg class="w-4 h-4 text-accent transition-transform group-open:rotate-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            What shells are supported?
+          </summary>
+          <p class="text-sm text-muted mt-3 ml-6">zsh, bash, and fish. Run <code class="font-mono text-white/70">llmux init &lt;shell&gt;</code> to install a thin shell wrapper. The wrapper intercepts <code class="font-mono text-white/70">claude</code> commands and routes them through llmux — all logic lives in the Go binary, not in shell scripts.</p>
+        </details>
+        <details class="group">
+          <summary class="cursor-pointer font-semibold text-white/90 flex items-center gap-2">
+            <svg class="w-4 h-4 text-accent transition-transform group-open:rotate-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            Is llmux free and open source?
+          </summary>
+          <p class="text-sm text-muted mt-3 ml-6">Yes. llmux is MIT-licensed and available on <a href="https://github.com/alansikora/llmux" class="text-accent hover:underline">GitHub</a>. It's written in Go with no runtime dependencies.</p>
+        </details>
       </div>
     </div>
   </section>

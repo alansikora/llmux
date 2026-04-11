@@ -3,7 +3,7 @@
 [![GitHub release](https://img.shields.io/github/v/release/alansikora/llmux)](https://github.com/alansikora/llmux/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Workspace manager for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Run multiple isolated sessions — each project gets its own authentication, settings, and history. No manual env vars, no wrapper scripts.
+**[llmux.sh](https://llmux.sh)** — Workspace manager for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Run multiple isolated sessions — each project gets its own authentication, settings, and history. No manual env vars, no wrapper scripts.
 
 <!-- TODO: add a GIF/screenshot of the TUI here -->
 
@@ -11,7 +11,7 @@ Workspace manager for [Claude Code](https://docs.anthropic.com/en/docs/claude-co
 
 ```bash
 # Install
-curl -fsSL https://raw.githubusercontent.com/alansikora/llmux/main/install.sh | sh
+curl -fsSL https://llmux.sh/install | sh
 
 # Set up your shell
 llmux init zsh   # or bash / fish
@@ -48,7 +48,7 @@ INSTALL_DIR=/usr/local/bin curl -fsSL https://raw.githubusercontent.com/alansiko
 **Canary (latest from `main`):**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/alansikora/llmux/main/install.sh | sh -s -- --canary
+curl -fsSL https://llmux.sh/install | sh -s -- --canary
 ```
 
 </details>
