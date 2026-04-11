@@ -28,7 +28,7 @@ From the TUI: create a workspace, add a project directory, and you're done. Run 
 **With Go:**
 
 ```bash
-go install github.com/allskar/llmux@latest
+go install github.com/alansikora/llmux@latest
 ```
 
 **From source:**
@@ -90,6 +90,7 @@ When a workspace has **Always use worktree** enabled, Claude Code runs in an iso
 - **Apply marker** — drop a `.llmux-applied` file when a session is applied (visible in `git status`)
 - **Short alias** — optionally define `c` as a shorthand for `claude`
 - **Project overrides** — override any workspace default (worktree, attributions) per project directory
+- **Auto-update** — `llmux upgrade` checks GitHub releases and upgrades in place, with update notices in the TUI
 
 ## Usage
 
