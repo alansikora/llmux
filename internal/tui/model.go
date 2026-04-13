@@ -293,11 +293,21 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.generalOptionsForm = f
 		}
 		if m.generalOptionsForm.State == huh.StateCompleted {
+			// Snapshot the previous values so we can roll back if the write
+			// fails and keep m.cfg in sync with disk.
+			prevAlias := m.cfg.ShortAlias
+			prevApply := m.cfg.ApplyMarker
+			prevAuto := m.cfg.AutoMode
+			prevStatus := m.cfg.StatusLine
 			m.cfg.ShortAlias = m.generalOptionsData.ShortAlias
 			m.cfg.ApplyMarker = m.generalOptionsData.ApplyMarker
 			m.cfg.AutoMode = m.generalOptionsData.AutoMode
 			m.cfg.StatusLine = m.generalOptionsData.StatusLine
 			if err := config.Save(m.cfg); err != nil {
+				m.cfg.ShortAlias = prevAlias
+				m.cfg.ApplyMarker = prevApply
+				m.cfg.AutoMode = prevAuto
+				m.cfg.StatusLine = prevStatus
 				m.statusMsg = fmt.Sprintf("save error: %v", err)
 				m.state = stateProjectList
 				m.refreshProjectList()
@@ -517,6 +527,10 @@ func (m *Model) applyProfileAdd() {
 		return
 	}
 	if err := config.Save(m.cfg); err != nil {
+		// Roll back the in-memory addition so m.cfg stays in sync with disk;
+		// otherwise a later save from anywhere else would silently persist
+		// this profile we never committed.
+		_ = m.cfg.RemoveProfile(name)
 		m.statusMsg = fmt.Sprintf("save error: %v", err)
 		return
 	}
