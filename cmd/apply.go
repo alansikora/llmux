@@ -35,11 +35,11 @@ var applyCmd = &cobra.Command{
 			sessionName = detected
 		}
 
-		var wsArgs []string
-		if applyWorkspace != "" {
-			wsArgs = []string{applyWorkspace}
+		var profileArgs []string
+		if applyProfile != "" {
+			profileArgs = []string{applyProfile}
 		}
-		_, _, err = resolveWorkspace(cfg, wsArgs)
+		_, _, err = resolveProfile(cfg, profileArgs)
 		if err != nil {
 			return err
 		}
@@ -56,9 +56,9 @@ var applyCmd = &cobra.Command{
 	},
 }
 
-var applyWorkspace string
+var applyProfile string
 
 func init() {
-	applyCmd.Flags().StringVarP(&applyWorkspace, "workspace", "w", "", "workspace name")
+	applyCmd.Flags().StringVarP(&applyProfile, "profile", "p", "", "profile name")
 	rootCmd.AddCommand(applyCmd)
 }

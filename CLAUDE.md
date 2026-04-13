@@ -1,13 +1,13 @@
 # llmux
 
-Workspace manager for Claude Code. Enables isolated Claude sessions with separate authentication, settings, and history per project.
+Session manager for Claude Code. Enables isolated Claude sessions with separate authentication, settings, and history per project, grouped into reusable auth profiles.
 
 ## Project structure
 
 ```
 cmd/             # CLI commands (cobra)
 internal/
-  config/        # Workspace config, path resolution, persistence
+  config/        # Profile/project config, path resolution, persistence
   tui/           # Interactive terminal UI (bubbletea + huh + lipgloss)
   shell/         # Shell integration generator (claude() wrapper)
   worktree/      # Git worktree session management
@@ -34,11 +34,13 @@ Version is set via ldflags: `-X main.version=v{version}`
 
 ## Architecture notes
 
-- **Workspace resolution** uses longest-prefix path matching with path-separator boundaries
-- **Config** stored as JSON in `~/.config/llmux/` (overridable via `LLMUX_CONFIG_DIR`)
-- **Session data** lives in `~/.config/llmux/sessions/{workspace}/`
-- **Shell integration** generates a `claude()` wrapper function that calls `llmux resolve` to route to the correct workspace
-- **TUI** is a state machine with 7 states (list, adding, options, sessions, etc.)
+- **Profile** = auth/credentials bundle (OAuth subscription or API key). Session directories with `.claude.json` and `settings.json` are per-profile.
+- **Project** = a directory path + profile reference. Projects are the primary entity — the main TUI view is a flat alphabetical list of all projects.
+- **Profile resolution** uses longest-prefix path matching against registered project paths (with path-separator boundaries). If no project matches, falls back to the default profile.
+- **Config** stored as JSON in `~/.config/llmux/` (overridable via `LLMUX_CONFIG_DIR`). Legacy configs with `workspaces` are auto-migrated to `profiles` on load.
+- **Session data** lives in `~/.config/llmux/sessions/{profile}/`
+- **Shell integration** generates a `claude()` wrapper function that calls `llmux resolve` to route to the correct profile based on `pwd`.
+- **TUI** is a state machine with 10 states (project list as main view, plus project/profile/session forms and views).
 
 ## Rules
 

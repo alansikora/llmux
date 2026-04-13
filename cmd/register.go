@@ -11,7 +11,7 @@ import (
 
 var registerCmd = &cobra.Command{
 	Use:    "register [path]",
-	Short:  "Register a directory to a workspace",
+	Short:  "Register a directory to a profile",
 	Args:   cobra.ExactArgs(1),
 	Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -20,8 +20,8 @@ var registerCmd = &cobra.Command{
 			return err
 		}
 
-		if len(cfg.Workspaces) == 0 {
-			return fmt.Errorf("no workspaces configured. Run 'llmux' to create one")
+		if len(cfg.Profiles) == 0 {
+			return fmt.Errorf("no profiles configured. Run 'llmux' to create one")
 		}
 
 		dir, err := filepath.Abs(args[0])
@@ -31,24 +31,24 @@ var registerCmd = &cobra.Command{
 		dir = filepath.Clean(dir)
 
 		// Build options list
-		options := make([]huh.Option[string], len(cfg.Workspaces))
-		for i, ws := range cfg.Workspaces {
-			label := ws.Name
-			authInfo := config.GetAuthInfo(ws.Name)
+		options := make([]huh.Option[string], len(cfg.Profiles))
+		for i, pf := range cfg.Profiles {
+			label := pf.Name
+			authInfo := config.GetAuthInfo(pf.Name)
 			if authInfo.Authenticated {
-				label = fmt.Sprintf("%s (%s)", ws.Name, authInfo.Email)
+				label = fmt.Sprintf("%s (%s)", pf.Name, authInfo.Email)
 			}
-			options[i] = huh.NewOption(label, ws.Name)
+			options[i] = huh.NewOption(label, pf.Name)
 		}
 
-		// Pre-select default workspace
+		// Pre-select default profile
 		selected := ""
-		if cfg.DefaultWorkspace != "" {
-			selected = cfg.DefaultWorkspace
+		if cfg.DefaultProfile != "" {
+			selected = cfg.DefaultProfile
 		}
 
 		err = huh.NewSelect[string]().
-			Title(fmt.Sprintf("Select workspace for %s", dir)).
+			Title(fmt.Sprintf("Select profile for %s", dir)).
 			Options(options...).
 			Value(&selected).
 			Run()

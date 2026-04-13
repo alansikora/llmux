@@ -9,11 +9,11 @@ import (
 )
 
 var commands = map[string]string{
-	"apply": `Run ` + "`llmux apply`" + ` to apply this worktree session's changes to the main workspace. The command auto-detects the current session name from the working directory.
+	"apply": `Run ` + "`llmux apply`" + ` to apply this worktree session's changes to the main working tree. The command auto-detects the current session name from the working directory.
 
 If it fails because another session is already applied, tell the user to run ` + "`/unapply`" + ` first.
 `,
-	"unapply": `Run ` + "`llmux unapply`" + ` to revert previously applied worktree session changes from the main workspace.
+	"unapply": `Run ` + "`llmux unapply`" + ` to revert previously applied worktree session changes from the main working tree.
 
 If no session is currently applied, let the user know.
 `,
@@ -21,7 +21,7 @@ If no session is currently applied, let the user know.
 
 // Install writes the llmux slash commands to ~/.claude/commands/llmux/
 // and ensures all existing session directories have a symlink to
-// ~/.claude/commands so commands are available in every workspace.
+// ~/.claude/commands so commands are available in every profile.
 // Returns the directory path where commands were installed.
 func Install() (string, error) {
 	home, err := os.UserHomeDir()
@@ -48,7 +48,7 @@ func Install() (string, error) {
 	}
 
 	// Ensure all existing session directories have the commands symlink.
-	// This covers workspaces that were resolved before commands were installed
+	// This covers profiles that were resolved before commands were installed
 	// (e.g. after an upgrade).
 	EnsureSessionSymlinks(commandsDir)
 

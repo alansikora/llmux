@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -56,57 +57,77 @@ func ListSessions(workspacePath string) ([]Session, error) {
 		return nil, err
 	}
 
-	var sessions []Session
+	// Collect candidate directories first.
+	var names []string
 	for _, entry := range entries {
 		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
-
 		wtPath := filepath.Join(dir, entry.Name())
-
 		// Verify it's a git worktree by checking for .git file
-		gitPath := filepath.Join(wtPath, ".git")
-		if _, err := os.Stat(gitPath); err != nil {
+		if _, err := os.Stat(filepath.Join(wtPath, ".git")); err != nil {
 			continue
 		}
+		names = append(names, entry.Name())
+	}
 
-		branch, err := runGit(wtPath, "rev-parse", "--abbrev-ref", "HEAD")
-		if err != nil {
-			continue
-		}
+	// Fetch per-session metadata in parallel. Each session requires 3
+	// sequential git calls (branch, diff-stat, last-activity), so we run
+	// one goroutine per session to maximise concurrency.
+	results := make([]*Session, len(names))
+	var wg sync.WaitGroup
+	for i, name := range names {
+		wg.Add(1)
+		go func(i int, name string) {
+			defer wg.Done()
+			wtPath := filepath.Join(dir, name)
 
-		trimmedBranch := strings.TrimSpace(branch)
+			branch, err := runGit(wtPath, "rev-parse", "--abbrev-ref", "HEAD")
+			if err != nil {
+				return
+			}
+			trimmedBranch := strings.TrimSpace(branch)
 
-		changedFiles := 0
-		stat, err := runGit(workspacePath, "diff", "--stat", "HEAD..."+trimmedBranch)
-		if err == nil {
-			lines := strings.Split(strings.TrimSpace(stat), "\n")
-			if len(lines) > 0 {
-				// Last line is summary like " 3 files changed, 10 insertions(+), 2 deletions(-)"
-				summary := lines[len(lines)-1]
-				if parts := strings.Fields(summary); len(parts) >= 1 {
-					if n, err := strconv.Atoi(parts[0]); err == nil {
-						changedFiles = n
+			changedFiles := 0
+			if stat, err := runGit(workspacePath, "diff", "--stat", "HEAD..."+trimmedBranch); err == nil {
+				lines := strings.Split(strings.TrimSpace(stat), "\n")
+				if len(lines) > 0 {
+					// Last line is summary like " 3 files changed, 10 insertions(+), 2 deletions(-)"
+					summary := lines[len(lines)-1]
+					if parts := strings.Fields(summary); len(parts) >= 1 {
+						if n, err := strconv.Atoi(parts[0]); err == nil {
+							changedFiles = n
+						}
 					}
 				}
 			}
-		}
 
-		var lastActivity time.Time
-		if ts, err := runGit(wtPath, "log", "-1", "--format=%ct"); err == nil {
-			if epoch, err := strconv.ParseInt(strings.TrimSpace(ts), 10, 64); err == nil {
-				lastActivity = time.Unix(epoch, 0)
+			var lastActivity time.Time
+			if ts, err := runGit(wtPath, "log", "-1", "--format=%ct"); err == nil {
+				if epoch, err := strconv.ParseInt(strings.TrimSpace(ts), 10, 64); err == nil {
+					lastActivity = time.Unix(epoch, 0)
+				}
 			}
-		}
 
-		sessions = append(sessions, Session{
-			Name:          entry.Name(),
-			Branch:        trimmedBranch,
-			ChangedFiles:  changedFiles,
-			LastActivity:  lastActivity,
-			Path:          wtPath,
-			WorkspacePath: workspacePath,
-		})
+			results[i] = &Session{
+				Name:          name,
+				Branch:        trimmedBranch,
+				ChangedFiles:  changedFiles,
+				LastActivity:  lastActivity,
+				Path:          wtPath,
+				WorkspacePath: workspacePath,
+			}
+		}(i, name)
+	}
+	wg.Wait()
+
+	// Preserve directory order from the parallel fetch, dropping any that
+	// failed the branch lookup (nil entries).
+	sessions := make([]Session, 0, len(results))
+	for _, s := range results {
+		if s != nil {
+			sessions = append(sessions, *s)
+		}
 	}
 
 	sort.Slice(sessions, func(i, j int) bool {

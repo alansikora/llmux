@@ -24,6 +24,7 @@ func SessionsDir() string {
 	return filepath.Join(ConfigDir(), "sessions")
 }
 
+// SessionDir returns the session directory for a profile.
 func SessionDir(name string) string {
 	return filepath.Join(SessionsDir(), name)
 }
@@ -42,40 +43,68 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
-	// Migrate legacy format: workspaces with "path" field → projects
-	type legacyWorkspace struct {
-		Name     string `json:"name"`
-		Path     string `json:"path,omitempty"`
-		Worktree bool   `json:"worktree,omitempty"`
-	}
-	type legacyConfig struct {
-		Workspaces []legacyWorkspace `json:"workspaces"`
-	}
-
-	var legacy legacyConfig
-	if err := json.Unmarshal(data, &legacy); err == nil {
-		needsMigration := false
-		for _, lws := range legacy.Workspaces {
-			if lws.Path != "" {
-				needsMigration = true
-				break
-			}
+	// Migrate legacy format: "workspaces" → "profiles", and the older
+	// workspace-with-inline-path shape into top-level Projects.
+	if len(cfg.Profiles) == 0 {
+		type legacyWorkspace struct {
+			Name     string `json:"name"`
+			Path     string `json:"path,omitempty"`
+			Worktree bool   `json:"worktree,omitempty"`
+		}
+		type legacyProject struct {
+			Path      string           `json:"path"`
+			Workspace string           `json:"workspace"`
+			Overrides ProjectOverrides `json:"overrides,omitempty"`
+		}
+		type legacyConfig struct {
+			Workspaces       []legacyWorkspace `json:"workspaces"`
+			Projects         []legacyProject   `json:"projects"`
+			DefaultWorkspace string            `json:"default_workspace,omitempty"`
 		}
 
-		if needsMigration {
-			cfg.Workspaces = nil
+		var legacy legacyConfig
+		if err := json.Unmarshal(data, &legacy); err == nil && len(legacy.Workspaces) > 0 {
+			// Build profiles and projects fresh from the legacy format.
+			// We reset cfg.Projects because the first unmarshal populated it
+			// with the old `workspace` field JSON tags, which don't map to
+			// the new `profile` field — so those entries have empty profiles.
+			cfg.Profiles = nil
+			cfg.Projects = nil
+			// Track paths we've already added to dedupe between inline paths
+			// and explicit projects.
+			seen := map[string]bool{}
 			for _, lws := range legacy.Workspaces {
-				cfg.Workspaces = append(cfg.Workspaces, Workspace{
+				cfg.Profiles = append(cfg.Profiles, Profile{
 					Name:     lws.Name,
 					Worktree: lws.Worktree,
 				})
 				if lws.Path != "" {
-					cfg.Projects = append(cfg.Projects, Project{
-						Path:      lws.Path,
-						Workspace: lws.Name,
-					})
+					abs, _ := filepath.Abs(lws.Path)
+					abs = filepath.Clean(abs)
+					if !seen[abs] {
+						cfg.Projects = append(cfg.Projects, Project{
+							Path:    abs,
+							Profile: lws.Name,
+						})
+						seen[abs] = true
+					}
 				}
 			}
+			for _, lp := range legacy.Projects {
+				abs, _ := filepath.Abs(lp.Path)
+				abs = filepath.Clean(abs)
+				if seen[abs] {
+					continue
+				}
+				cfg.Projects = append(cfg.Projects, Project{
+					Path:      abs,
+					Profile:   lp.Workspace,
+					Overrides: lp.Overrides,
+				})
+				seen[abs] = true
+			}
+			cfg.DefaultProfile = legacy.DefaultWorkspace
+
 			if err := Save(&cfg); err != nil {
 				fmt.Fprintf(os.Stderr, "llmux: warning: failed to save migrated config (will retry on next launch): %v\n", err)
 			}
@@ -131,7 +160,7 @@ func RenameSessionDir(oldName, newName string) error {
 	return os.Rename(oldDir, newDir)
 }
 
-// RemoveSessionDir removes the session directory for a workspace.
+// RemoveSessionDir removes the session directory for a profile.
 // It is a no-op if the directory does not exist.
 func RemoveSessionDir(name string) error {
 	dir := SessionDir(name)
@@ -176,11 +205,11 @@ func newStatusLineConfig() map[string]any {
 	}
 }
 
-// SyncWorkspaceSettings writes all llmux-managed keys to a workspace's
+// SyncProfileSettings writes all llmux-managed keys to a profile's
 // settings.json. It is idempotent and preserves unmanaged keys.
 // The write is skipped if the resulting JSON is identical to what is on disk.
-func SyncWorkspaceSettings(cfg *Config, wsName string) error {
-	existing, _ := os.ReadFile(filepath.Join(SessionDir(wsName), "settings.json"))
+func SyncProfileSettings(cfg *Config, profileName string) error {
+	existing, _ := os.ReadFile(filepath.Join(SessionDir(profileName), "settings.json"))
 
 	var settings map[string]any
 	if len(existing) > 0 {
@@ -202,7 +231,7 @@ func SyncWorkspaceSettings(cfg *Config, wsName string) error {
 	// manage the defaultMode key reliably.
 	if raw, exists := settings["permissions"]; exists {
 		if _, ok := raw.(map[string]any); !ok {
-			fmt.Fprintf(os.Stderr, "llmux: warning: workspace %s has non-object permissions in settings.json, resetting\n", wsName)
+			fmt.Fprintf(os.Stderr, "llmux: warning: profile %s has non-object permissions in settings.json, resetting\n", profileName)
 			delete(settings, "permissions")
 		}
 	}
@@ -235,22 +264,22 @@ func SyncWorkspaceSettings(cfg *Config, wsName string) error {
 			return nil
 		}
 	}
-	return WriteSessionSettings(wsName, settings)
+	return WriteSessionSettings(profileName, settings)
 }
 
-// SyncAllWorkspaceSettings syncs settings for all workspaces.
-func SyncAllWorkspaceSettings(cfg *Config) error {
+// SyncAllProfileSettings syncs settings for all profiles.
+func SyncAllProfileSettings(cfg *Config) error {
 	var errs []error
-	for _, ws := range cfg.Workspaces {
-		if err := SyncWorkspaceSettings(cfg, ws.Name); err != nil {
-			errs = append(errs, fmt.Errorf("workspace %s: %w", ws.Name, err))
+	for _, pf := range cfg.Profiles {
+		if err := SyncProfileSettings(cfg, pf.Name); err != nil {
+			errs = append(errs, fmt.Errorf("profile %s: %w", pf.Name, err))
 		}
 	}
 	return errors.Join(errs...)
 }
 
 // IsAttributionDisabled reports whether the attribution-suppression key
-// is present in a workspace's session settings.
+// is present in a profile's session settings.
 func IsAttributionDisabled(name string) bool {
 	settings := ReadSessionSettings(name)
 	if settings == nil {
@@ -260,7 +289,7 @@ func IsAttributionDisabled(name string) bool {
 	return ok
 }
 
-// SetAttribution enables or disables the attribution setting for a workspace.
+// SetAttribution enables or disables the attribution setting for a profile.
 func SetAttribution(name string, disabled bool) error {
 	settings := ReadSessionSettings(name)
 	if settings == nil {
@@ -277,7 +306,7 @@ func SetAttribution(name string, disabled bool) error {
 	return WriteSessionSettings(name, settings)
 }
 
-// AuthInfo holds display information about a workspace's authentication.
+// AuthInfo holds display information about a profile's authentication.
 type AuthInfo struct {
 	Authenticated bool
 	Email         string
@@ -307,7 +336,7 @@ func GetAuthInfo(name string) AuthInfo {
 	}
 }
 
-// IsAuthenticated reports whether a workspace has valid auth credentials.
+// IsAuthenticated reports whether a profile has valid auth credentials.
 func IsAuthenticated(name string) bool {
 	return GetAuthInfo(name).Authenticated
 }

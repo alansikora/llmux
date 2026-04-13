@@ -4,18 +4,18 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
+	"github.com/allskar/llmux/internal/config"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
-
-	"github.com/allskar/llmux/internal/config"
 )
 
-// --- Workspace list item ---
+// --- Profile list item (secondary view: profile management) ---
 
-type workspaceItem struct {
+type profileItem struct {
 	name         string
 	authInfo     config.AuthInfo
 	isDefault    bool
@@ -23,51 +23,50 @@ type workspaceItem struct {
 	loading      string
 }
 
-func (w workspaceItem) Title() string {
-	if w.loading != "" {
-		prefix := unauthStyle.Render("[no auth]")
-		if w.authInfo.Authenticated {
-			prefix = authStyle.Render("[" + w.authInfo.Email + "]")
-		}
-		return fmt.Sprintf("%s %s %s", prefix, w.name, w.loading)
-	}
-
+func (p profileItem) Title() string {
 	prefix := unauthStyle.Render("[no auth]")
-	if w.authInfo.Authenticated {
-		prefix = authStyle.Render("[" + w.authInfo.Email + "]")
+	if p.authInfo.Authenticated {
+		prefix = authStyle.Render("[" + p.authInfo.Email + "]")
 	}
-
+	if p.loading != "" {
+		return fmt.Sprintf("%s %s %s", prefix, p.name, p.loading)
+	}
 	star := " "
-	if w.isDefault {
+	if p.isDefault {
 		star = "★"
 	}
-
-	return fmt.Sprintf("%s %s %s", prefix, w.name, star)
+	return fmt.Sprintf("%s %s %s", prefix, p.name, star)
 }
 
-func (w workspaceItem) Description() string {
-	if w.projectCount == 1 {
+func (p profileItem) Description() string {
+	if p.projectCount == 1 {
 		return "1 project"
 	}
-	return fmt.Sprintf("%d projects", w.projectCount)
+	return fmt.Sprintf("%d projects", p.projectCount)
 }
 
-func (w workspaceItem) FilterValue() string { return w.name }
+func (p profileItem) FilterValue() string { return p.name }
 
-// --- Project list item ---
+// --- Project list item (main view) ---
 
 type projectItem struct {
+	name      string
 	path      string
-	workspace string
+	profile   string
+	authInfo  config.AuthInfo
 	overrides config.ProjectOverrides
 }
 
 func (p projectItem) Title() string {
-	return filepath.Base(p.path)
+	prefix := unauthStyle.Render("[no auth]")
+	if p.authInfo.Authenticated {
+		prefix = authStyle.Render("[" + p.authInfo.Email + "]")
+	}
+	return fmt.Sprintf("%s %s", prefix, p.name)
 }
 
 func (p projectItem) Description() string {
-	desc := p.path
+	desc := fmt.Sprintf("%s · %s", p.path, p.profile)
 	if p.overrides.Worktree != nil {
 		if *p.overrides.Worktree {
 			desc += " [worktree: on]"
@@ -78,29 +77,36 @@ func (p projectItem) Description() string {
 	return desc
 }
 
-func (p projectItem) FilterValue() string { return filepath.Base(p.path) }
+func (p projectItem) FilterValue() string { return p.name }
 
 // --- Item builders ---
 
-func workspaceItems(cfg *config.Config) []list.Item {
-	items := make([]list.Item, len(cfg.Workspaces))
-	for i, ws := range cfg.Workspaces {
-		items[i] = workspaceItem{
-			name:         ws.Name,
-			authInfo:     config.GetAuthInfo(ws.Name),
-			isDefault:    ws.Name == cfg.DefaultWorkspace,
-			projectCount: len(cfg.ProjectsForWorkspace(ws.Name)),
+func profileItems(cfg *config.Config) []list.Item {
+	items := make([]list.Item, len(cfg.Profiles))
+	for i, pf := range cfg.Profiles {
+		items[i] = profileItem{
+			name:         pf.Name,
+			authInfo:     config.GetAuthInfo(pf.Name),
+			isDefault:    pf.Name == cfg.DefaultProfile,
+			projectCount: len(cfg.ProjectsForProfile(pf.Name)),
 		}
 	}
 	return items
 }
 
-func projectItems(projects []config.Project) []list.Item {
-	items := make([]list.Item, len(projects))
-	for i, p := range projects {
+func projectItems(cfg *config.Config) []list.Item {
+	sorted := make([]config.Project, len(cfg.Projects))
+	copy(sorted, cfg.Projects)
+	sort.Slice(sorted, func(i, j int) bool {
+		return strings.ToLower(filepath.Base(sorted[i].Path)) < strings.ToLower(filepath.Base(sorted[j].Path))
+	})
+	items := make([]list.Item, len(sorted))
+	for i, p := range sorted {
 		items[i] = projectItem{
+			name:      filepath.Base(p.Path),
 			path:      p.Path,
-			workspace: p.Workspace,
+			profile:   p.Profile,
+			authInfo:  config.GetAuthInfo(p.Profile),
 			overrides: p.Overrides,
 		}
 	}
@@ -109,40 +115,15 @@ func projectItems(projects []config.Project) []list.Item {
 
 // --- List builders ---
 
-const logo = ` _ _
-| | |_ __ ___  _   ___  __
-| | | '_ ` + "`" + ` _ \| | | \ \/ /
-| | | | | | | | |_| |>  <
-|_|_|_| |_| |_|\__,_/_/\_\`
+// topBarHeight is the vertical space reserved for the top bar header
+// (1 line for breadcrumb/version + 1 blank separator line).
+const topBarHeight = 2
 
-// headerHeight is the number of lines the logo occupies, plus 1 for the version line and 1 for padding.
-var headerHeight = strings.Count(logo, "\n") + 3
-
-func buildWorkspaceList(cfg *config.Config, version string, width, height int) list.Model {
+// buildProjectList is the main view: a flat alphabetical list of all projects.
+func buildProjectList(cfg *config.Config, width, height int) list.Model {
 	delegate := list.NewDefaultDelegate()
-	l := list.New(workspaceItems(cfg), delegate, width, height)
-	l.Title = "Workspaces"
-	l.SetShowStatusBar(true)
-	l.SetShowHelp(true)
-	l.AdditionalShortHelpKeys = func() []key.Binding {
-		return []key.Binding{
-			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "projects")),
-			key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add")),
-			key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "rename")),
-			key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "edit")),
-			key.NewBinding(key.WithKeys("d", "x"), key.WithHelp("d", "delete")),
-			key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "set default")),
-			key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "general options")),
-		}
-	}
-	l.AdditionalFullHelpKeys = l.AdditionalShortHelpKeys
-	return l
-}
-
-func buildProjectList(projects []config.Project, wsName string, width, height int) list.Model {
-	delegate := list.NewDefaultDelegate()
-	l := list.New(projectItems(projects), delegate, width, height)
-	l.Title = fmt.Sprintf("Projects: %s", wsName)
+	l := list.New(projectItems(cfg), delegate, width, height)
+	l.Title = "Projects"
 	l.SetShowStatusBar(true)
 	l.SetShowHelp(true)
 	l.AdditionalShortHelpKeys = func() []key.Binding {
@@ -151,6 +132,29 @@ func buildProjectList(projects []config.Project, wsName string, width, height in
 			key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add")),
 			key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "edit")),
 			key.NewBinding(key.WithKeys("d", "x"), key.WithHelp("d", "delete")),
+			key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "profiles")),
+			key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "general options")),
+			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "quit")),
+		}
+	}
+	l.AdditionalFullHelpKeys = l.AdditionalShortHelpKeys
+	return l
+}
+
+// buildProfileList is the secondary view: manage profiles (add/rename/edit/delete/set default).
+func buildProfileList(cfg *config.Config, width, height int) list.Model {
+	delegate := list.NewDefaultDelegate()
+	l := list.New(profileItems(cfg), delegate, width, height)
+	l.Title = "Profiles"
+	l.SetShowStatusBar(true)
+	l.SetShowHelp(true)
+	l.AdditionalShortHelpKeys = func() []key.Binding {
+		return []key.Binding{
+			key.NewBinding(key.WithKeys("enter", "e"), key.WithHelp("enter", "edit")),
+			key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add")),
+			key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "rename")),
+			key.NewBinding(key.WithKeys("d", "x"), key.WithHelp("d", "delete")),
+			key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "set default")),
 			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
 		}
 	}
@@ -158,9 +162,9 @@ func buildProjectList(projects []config.Project, wsName string, width, height in
 	return l
 }
 
-// --- Workspace list update ---
+// --- Project list update (main view) ---
 
-func updateWorkspaceList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
+func updateProjectList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if m.list.FilterState() == list.Filtering {
@@ -168,126 +172,38 @@ func updateWorkspaceList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		switch msg.String() {
 		case "a":
-			m.state = stateWorkspaceAdding
-			defaultName := ""
-			if cwd, err := os.Getwd(); err == nil {
-				defaultName = filepath.Base(cwd)
-			}
-			m.wsAddData = wsAddFormData{Name: defaultName}
-			m.wsAddForm = newWsAddForm(&m.wsAddData)
-			return m, m.wsAddForm.Init()
-		case "r":
-			if item, ok := m.list.SelectedItem().(workspaceItem); ok {
-				m.wsRenameTarget = item.name
-				m.wsRenameData = wsRenameFormData{Name: item.name}
-				m.wsRenameForm = newWsRenameForm(&m.wsRenameData)
-				m.state = stateWorkspaceRenaming
-				return m, m.wsRenameForm.Init()
-			}
-		case "enter":
-			if item, ok := m.list.SelectedItem().(workspaceItem); ok {
-				m.projectsTarget = item.name
-				projects := m.cfg.ProjectsForWorkspace(item.name)
-				h, v := appStyle.GetFrameSize()
-				m.projectList = buildProjectList(projects, item.name, m.width-h, m.height-v-headerHeight)
-				m.state = stateProjectList
+			if len(m.cfg.Profiles) == 0 {
+				m.statusMsg = "no profiles configured — press 'p' to create one first"
 				return m, nil
 			}
-		case "e":
-			if item, ok := m.list.SelectedItem().(workspaceItem); ok {
-				attrVal := "disabled"
-				if config.IsAttributionDisabled(item.name) {
-					attrVal = "enabled"
-				}
-				worktreeVal := "disabled"
-				for _, ws := range m.cfg.Workspaces {
-					if ws.Name == item.name {
-						if ws.Worktree {
-							worktreeVal = "enabled"
-						}
-						break
-					}
-				}
-				m.wsOptionsTarget = item.name
-				m.optionsData = optionsFormData{
-					DisableAttribution: attrVal,
-					Worktree:           worktreeVal,
-				}
-				m.optionsForm = newOptionsForm(&m.optionsData, m.optionsData, false, nil)
-				m.state = stateWorkspaceOptions
-				return m, m.optionsForm.Init()
-			}
-		case "s":
-			if item, ok := m.list.SelectedItem().(workspaceItem); ok {
-				if m.cfg.DefaultWorkspace == item.name {
-					m.cfg.SetDefault("")
-				} else {
-					m.cfg.SetDefault(item.name)
-				}
-				config.Save(m.cfg)
-				m.refreshWorkspaceList()
-				return m, nil
-			}
-		case "o":
-			m.generalOptionsData = generalOptionsFormData{
-				ShortAlias:  m.cfg.ShortAlias,
-				ApplyMarker: m.cfg.ApplyMarker,
-				AutoMode:    m.cfg.AutoMode,
-				StatusLine:  m.cfg.StatusLine,
-			}
-			m.generalOptionsForm = newGeneralOptionsForm(&m.generalOptionsData, m.generalOptionsData)
-			m.state = stateGeneralOptions
-			return m, m.generalOptionsForm.Init()
-		case "d", "x":
-			if item, ok := m.list.SelectedItem().(workspaceItem); ok {
-				m.state = stateWorkspaceDeleting
-				m.deleteTarget = item.name
-				m.deleteData = deleteFormData{}
-				m.deleteForm = newDeleteForm(item.name, &m.deleteData)
-				return m, m.deleteForm.Init()
-			}
-		}
-	}
-
-	var cmd tea.Cmd
-	m.list, cmd = m.list.Update(msg)
-	return m, cmd
-}
-
-// --- Project list update ---
-
-func updateProjectList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		if m.projectList.FilterState() == list.Filtering {
-			break
-		}
-		switch msg.String() {
-		case "a":
 			m.state = stateProjectAdding
-			m.projAddData = projAddFormData{}
-			m.projAddForm = newProjAddForm(&m.projAddData)
+			defaultProfile := m.cfg.DefaultProfile
+			if defaultProfile == "" {
+				defaultProfile = m.cfg.Profiles[0].Name
+			}
+			m.projAddData = projAddFormData{Profile: defaultProfile}
+			m.projAddForm = newProjAddForm(&m.projAddData, m.cfg.Profiles)
 			return m, m.projAddForm.Init()
 		case "enter":
-			if item, ok := m.projectList.SelectedItem().(projectItem); ok {
+			if item, ok := m.list.SelectedItem().(projectItem); ok {
 				m.sessionsLoading = true
 				m.loadingProject = item.path
-				return m, tea.Batch(loadSessionsCmd(item.path, m.projectsTarget), m.spinner.Tick)
+				return m, tea.Batch(loadSessionsCmd(item.path, item.name), m.spinner.Tick)
 			}
 		case "e":
-			if item, ok := m.projectList.SelectedItem().(projectItem); ok {
-				// Determine workspace defaults for "inherit" labels
-				var ws *config.Workspace
-				for i := range m.cfg.Workspaces {
-					if m.cfg.Workspaces[i].Name == m.projectsTarget {
-						ws = &m.cfg.Workspaces[i]
+			if item, ok := m.list.SelectedItem().(projectItem); ok {
+				// Determine profile defaults for "inherit" labels
+				var pf *config.Profile
+				for i := range m.cfg.Profiles {
+					if m.cfg.Profiles[i].Name == item.profile {
+						pf = &m.cfg.Profiles[i]
 						break
 					}
 				}
-				defaults := &wsDefaults{}
-				if ws != nil {
-					defaults.Worktree = ws.Worktree
-					defaults.DisableAttribution = config.IsAttributionDisabled(ws.Name)
+				defaults := &profileDefaults{}
+				if pf != nil {
+					defaults.Worktree = pf.Worktree
+					defaults.DisableAttribution = config.IsAttributionDisabled(pf.Name)
 				}
 
 				worktreeVal := "inherit"
@@ -308,16 +224,108 @@ func updateProjectList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, m.optionsForm.Init()
 			}
 		case "d", "x":
-			if item, ok := m.projectList.SelectedItem().(projectItem); ok {
+			if item, ok := m.list.SelectedItem().(projectItem); ok {
 				m.cfg.RemoveProject(item.path)
 				config.Save(m.cfg)
 				m.refreshProjectList()
 				return m, nil
 			}
+		case "p":
+			h, v := appStyle.GetFrameSize()
+			m.profileList = buildProfileList(m.cfg, m.width-h, m.height-v-topBarHeight)
+			m.state = stateProfileList
+			return m, nil
+		case "o":
+			m.generalOptionsData = generalOptionsFormData{
+				ShortAlias:  m.cfg.ShortAlias,
+				ApplyMarker: m.cfg.ApplyMarker,
+				AutoMode:    m.cfg.AutoMode,
+				StatusLine:  m.cfg.StatusLine,
+			}
+			m.generalOptionsForm = newGeneralOptionsForm(&m.generalOptionsData, m.generalOptionsData)
+			m.state = stateGeneralOptions
+			return m, m.generalOptionsForm.Init()
 		}
 	}
 
 	var cmd tea.Cmd
-	m.projectList, cmd = m.projectList.Update(msg)
+	m.list, cmd = m.list.Update(msg)
+	return m, cmd
+}
+
+// --- Profile list update (secondary view) ---
+
+func updateProfileList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		if m.profileList.FilterState() == list.Filtering {
+			break
+		}
+		switch msg.String() {
+		case "a":
+			m.state = stateProfileAdding
+			defaultName := ""
+			if cwd, err := os.Getwd(); err == nil {
+				defaultName = filepath.Base(cwd)
+			}
+			m.profileAddData = profileAddFormData{Name: defaultName}
+			m.profileAddForm = newProfileAddForm(&m.profileAddData)
+			return m, m.profileAddForm.Init()
+		case "r":
+			if item, ok := m.profileList.SelectedItem().(profileItem); ok {
+				m.profileRenameTarget = item.name
+				m.profileRenameData = profileRenameFormData{Name: item.name}
+				m.profileRenameForm = newProfileRenameForm(&m.profileRenameData)
+				m.state = stateProfileRenaming
+				return m, m.profileRenameForm.Init()
+			}
+		case "e", "enter":
+			if item, ok := m.profileList.SelectedItem().(profileItem); ok {
+				attrVal := "disabled"
+				if config.IsAttributionDisabled(item.name) {
+					attrVal = "enabled"
+				}
+				worktreeVal := "disabled"
+				for _, pf := range m.cfg.Profiles {
+					if pf.Name == item.name {
+						if pf.Worktree {
+							worktreeVal = "enabled"
+						}
+						break
+					}
+				}
+				m.profileOptionsTarget = item.name
+				m.optionsData = optionsFormData{
+					DisableAttribution: attrVal,
+					Worktree:           worktreeVal,
+				}
+				m.optionsForm = newOptionsForm(&m.optionsData, m.optionsData, false, nil)
+				m.state = stateProfileOptions
+				return m, m.optionsForm.Init()
+			}
+		case "s":
+			if item, ok := m.profileList.SelectedItem().(profileItem); ok {
+				if m.cfg.DefaultProfile == item.name {
+					m.cfg.SetDefaultProfile("")
+				} else {
+					m.cfg.SetDefaultProfile(item.name)
+				}
+				config.Save(m.cfg)
+				m.refreshProfileList()
+				return m, nil
+			}
+		case "d", "x":
+			if item, ok := m.profileList.SelectedItem().(profileItem); ok {
+				m.state = stateProfileDeleting
+				m.deleteTarget = item.name
+				m.deleteData = deleteFormData{}
+				m.deleteForm = newDeleteForm("profile", item.name, &m.deleteData)
+				return m, m.deleteForm.Init()
+			}
+		}
+	}
+
+	var cmd tea.Cmd
+	m.profileList, cmd = m.profileList.Update(msg)
 	return m, cmd
 }

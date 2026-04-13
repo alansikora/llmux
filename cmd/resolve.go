@@ -44,7 +44,7 @@ func hasWorktreeOverride(claudeArgs []string) bool {
 
 var resolveCmd = &cobra.Command{
 	Use:           "resolve [path] [-- claude-args...]",
-	Short:         "Resolve workspace for a path",
+	Short:         "Resolve profile for a path",
 	Args:          cobra.MinimumNArgs(1),
 	Hidden:        true,
 	SilenceUsage:  true,
@@ -77,11 +77,11 @@ var resolveCmd = &cobra.Command{
 		}()
 
 		// Ensure session directory exists before EnsureSessionSymlinks runs,
-		// so commands are available on the very first launch of a new workspace.
+		// so commands are available on the very first launch of a new profile.
 		os.MkdirAll(result.SessionDir, 0755) //nolint:errcheck
 
 		// Sync managed settings (statusLine, autoMode, etc.) to settings.json
-		config.SyncWorkspaceSettings(cfg, result.WorkspaceName) //nolint:errcheck
+		config.SyncProfileSettings(cfg, result.ProfileName) //nolint:errcheck
 
 		commands.Ensure()
 
@@ -93,9 +93,9 @@ var resolveCmd = &cobra.Command{
 		fmt.Fprint(os.Stderr, versionLine)
 		if result.ProjectPath != "" {
 			projectName := filepath.Base(result.ProjectPath)
-			fmt.Fprintf(os.Stderr, "\033[90m↳ workspace: %s · project: %s\033[0m\n", result.WorkspaceName, projectName)
+			fmt.Fprintf(os.Stderr, "\033[90m↳ profile: %s · project: %s\033[0m\n", result.ProfileName, projectName)
 		} else {
-			fmt.Fprintf(os.Stderr, "\033[90m↳ workspace: %s (default)\033[0m\n", result.WorkspaceName)
+			fmt.Fprintf(os.Stderr, "\033[90m↳ profile: %s (default)\033[0m\n", result.ProfileName)
 		}
 		// Line 1: session directory
 		fmt.Println(result.SessionDir)

@@ -19,7 +19,7 @@ var unapplyCmd = &cobra.Command{
 			return err
 		}
 
-		_, _, err = resolveWorkspace(cfg, nil)
+		_, _, err = resolveProfile(cfg, nil)
 		if err != nil {
 			return err
 		}

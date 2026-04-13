@@ -10,8 +10,8 @@ import (
 )
 
 var sessionsCmd = &cobra.Command{
-	Use:   "sessions [workspace]",
-	Short: "List worktree sessions for a workspace",
+	Use:   "sessions [profile]",
+	Short: "List worktree sessions for a profile",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
@@ -19,7 +19,7 @@ var sessionsCmd = &cobra.Command{
 			return err
 		}
 
-		ws, _, err := resolveWorkspace(cfg, args)
+		pf, _, err := resolveProfile(cfg, args)
 		if err != nil {
 			return err
 		}
@@ -31,7 +31,7 @@ var sessionsCmd = &cobra.Command{
 		}
 		sessionsPath := worktree.ResolveSessionsPath(cwd)
 
-		_ = ws // workspace used for session dir context if needed
+		_ = pf // profile used for session dir context if needed
 
 		sessions, err := worktree.ListSessions(sessionsPath)
 		if err != nil {
@@ -56,18 +56,18 @@ var sessionsCmd = &cobra.Command{
 	},
 }
 
-// resolveWorkspace finds the workspace (and optionally project) for the given args.
-// If args has a name, looks up by workspace name. Otherwise uses cwd to find project → workspace.
-func resolveWorkspace(cfg *config.Config, args []string) (*config.Workspace, *config.Project, error) {
+// resolveProfile finds the profile (and optionally project) for the given args.
+// If args has a name, looks up by profile name. Otherwise uses cwd to find project → profile.
+func resolveProfile(cfg *config.Config, args []string) (*config.Profile, *config.Project, error) {
 	if len(args) > 0 {
-		ws, err := cfg.FindWorkspace(args[0])
-		return ws, nil, err
+		pf, err := cfg.FindProfile(args[0])
+		return pf, nil, err
 	}
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, nil, err
 	}
-	return cfg.FindWorkspaceForDir(cwd)
+	return cfg.FindProfileForDir(cwd)
 }
 
 func init() {
