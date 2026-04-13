@@ -118,7 +118,7 @@ llmux                       # open the TUI manager
 llmux list                  # list all projects with profile and auth status
 llmux sessions [profile]    # list worktree sessions for the current project
 llmux resume <name>         # resume a session by name or branch
-llmux apply [session]       # apply session changes to main (-p to specify profile)
+llmux apply [session]       # apply session changes to main working tree
 llmux unapply               # revert applied changes
 llmux upgrade               # upgrade to the latest version
 llmux init <shell> [--print]  # set up shell integration (or print without installing)

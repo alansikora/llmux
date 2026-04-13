@@ -225,8 +225,15 @@ func updateProjectList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "d", "x":
 			if item, ok := m.list.SelectedItem().(projectItem); ok {
-				m.cfg.RemoveProject(item.path)
-				config.Save(m.cfg)
+				if err := m.cfg.RemoveProject(item.path); err != nil {
+					m.statusMsg = fmt.Sprintf("remove error: %v", err)
+					return m, nil
+				}
+				if err := config.Save(m.cfg); err != nil {
+					m.statusMsg = fmt.Sprintf("save error: %v", err)
+					return m, nil
+				}
+				m.statusMsg = ""
 				m.refreshProjectList()
 				return m, nil
 			}
@@ -310,7 +317,11 @@ func updateProfileList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					m.cfg.SetDefaultProfile(item.name)
 				}
-				config.Save(m.cfg)
+				if err := config.Save(m.cfg); err != nil {
+					m.statusMsg = fmt.Sprintf("save error: %v", err)
+					return m, nil
+				}
+				m.statusMsg = ""
 				m.refreshProfileList()
 				return m, nil
 			}

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -44,8 +45,10 @@ func Load() (*Config, error) {
 	}
 
 	// Migrate legacy format: "workspaces" → "profiles", and the older
-	// workspace-with-inline-path shape into top-level Projects.
-	if len(cfg.Profiles) == 0 {
+	// workspace-with-inline-path shape into top-level Projects. Pre-check
+	// the raw JSON for a "workspaces" key so brand-new configs (with an
+	// empty or missing "profiles" key) don't pay for a second unmarshal.
+	if len(cfg.Profiles) == 0 && bytes.Contains(data, []byte(`"workspaces"`)) {
 		type legacyWorkspace struct {
 			Name     string `json:"name"`
 			Path     string `json:"path,omitempty"`

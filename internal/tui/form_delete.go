@@ -16,7 +16,7 @@ func newDeleteForm(entityType, name string, data *deleteFormData) *huh.Form {
 	var desc string
 	switch entityType {
 	case "profile":
-		desc = "This removes the profile config. The session directory is kept."
+		desc = "This removes the profile config, session directory (auth, history, settings), and all associated projects."
 	case "session":
 		desc = "This deletes the git worktree and removes its registration. Uncommitted changes in the worktree will be lost."
 	default:

@@ -71,7 +71,6 @@ Press `o` from the project list to configure global settings:
 
 ```bash
 llmux apply [session]       # from your main working tree
-llmux apply -p <profile>    # specify profile explicitly
 ```
 
 When run from inside a worktree, the session name is auto-detected.

@@ -354,6 +354,10 @@ func listSessionsInSubdirs(parentPath string) ([]Session, error) {
 	if err != nil {
 		return nil, nil
 	}
+	// Track the roots we've already descended into so that symlinks or
+	// unusual layouts can't cause `ListSessions` to recurse back into the
+	// parent (or any sibling whose resolved root matches another).
+	seen := map[string]bool{parentPath: true}
 	var all []Session
 	for _, entry := range entries {
 		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
@@ -364,6 +368,10 @@ func listSessionsInSubdirs(parentPath string) ([]Session, error) {
 			continue
 		}
 		repoRoot := ResolveSessionsPath(subPath)
+		if seen[repoRoot] {
+			continue
+		}
+		seen[repoRoot] = true
 		sessions, err := ListSessions(repoRoot)
 		if err != nil {
 			continue

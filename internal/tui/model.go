@@ -103,10 +103,14 @@ func NewModel(cfg *config.Config, version string, updateCh <-chan string) *Model
 func (m *Model) Init() tea.Cmd {
 	m.list = buildProjectList(m.cfg, 80, 20)
 	m.spinner = spinner.New(spinner.WithSpinner(spinner.Dot))
+	// Kick off the spinner ticker so any loading state entered during or
+	// shortly after Init animates. The TickMsg handler ignores ticks when
+	// no loading is in progress, so this is a no-op at rest.
+	cmds := []tea.Cmd{m.spinner.Tick}
 	if m.updateCh != nil {
-		return waitForUpdateCheck(m.updateCh)
+		cmds = append(cmds, waitForUpdateCheck(m.updateCh))
 	}
-	return nil
+	return tea.Batch(cmds...)
 }
 
 func waitForUpdateCheck(ch <-chan string) tea.Cmd {
@@ -171,7 +175,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		h, v := appStyle.GetFrameSize()
-		m.list.SetSize(msg.Width-h, msg.Height-v-topBarHeight)
+		w, hgt := msg.Width-h, msg.Height-v-topBarHeight
+		m.list.SetSize(w, hgt)
+		// Also resize the profile and sessions lists so they re-layout if
+		// the terminal is resized while they're the active view. SetSize
+		// on a zero-value list is a harmless no-op.
+		m.profileList.SetSize(w, hgt)
+		m.sessionsList.SetSize(w, hgt)
 		return m, nil
 
 	case tea.KeyMsg:
@@ -185,6 +195,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			case stateSessions:
 				m.sessionsLoading = false
+				m.loadingProject = ""
 				m.state = stateProjectList
 				m.refreshProjectList()
 				return m, nil
@@ -542,25 +553,35 @@ func (m *Model) applyProfileOptions(name string) {
 			break
 		}
 	}
-	config.Save(m.cfg)
+	if err := config.Save(m.cfg); err != nil {
+		m.statusMsg = fmt.Sprintf("save error: %v", err)
+		return
+	}
 
 	// Update session settings (attribution)
 	if err := config.SetAttribution(name, m.optionsData.DisableAttribution == "enabled"); err != nil {
 		m.statusMsg = fmt.Sprintf("attribution error: %v", err)
+		return
 	}
+	m.statusMsg = ""
 }
 
 func (m *Model) applyProjAdd() {
 	path := expandPath(m.projAddData.FolderPath)
 	abs, err := filepath.Abs(path)
 	if err != nil {
+		m.statusMsg = fmt.Sprintf("path error: %v", err)
 		return
 	}
 	if err := m.cfg.AddProject(abs, m.projAddData.Profile); err != nil {
 		m.statusMsg = fmt.Sprintf("add project error: %v", err)
 		return
 	}
-	config.Save(m.cfg)
+	if err := config.Save(m.cfg); err != nil {
+		m.statusMsg = fmt.Sprintf("save error: %v", err)
+		return
+	}
+	m.statusMsg = ""
 }
 
 func (m *Model) applyProjOptions() {
@@ -579,7 +600,11 @@ func (m *Model) applyProjOptions() {
 			break
 		}
 	}
-	config.Save(m.cfg)
+	if err := config.Save(m.cfg); err != nil {
+		m.statusMsg = fmt.Sprintf("save error: %v", err)
+		return
+	}
+	m.statusMsg = ""
 }
 
 // --- Refresh helpers ---

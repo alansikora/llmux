@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/allskar/llmux/internal/config"
 	"github.com/allskar/llmux/internal/worktree"
 	"github.com/spf13/cobra"
 )
@@ -14,20 +13,12 @@ var unapplyCmd = &cobra.Command{
 	Short: "Revert applied worktree session changes",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := config.Load()
-		if err != nil {
-			return err
-		}
-
-		_, _, err = resolveProfile(cfg, nil)
-		if err != nil {
-			return err
-		}
-
 		cwd, err := os.Getwd()
 		if err != nil {
 			return err
 		}
+		// Sessions live under the git main worktree root; they're not scoped
+		// by profile. `ResolveSessionsPath` walks up from cwd to find it.
 		sessionsPath := worktree.ResolveSessionsPath(cwd)
 
 		if err := worktree.Unapply(sessionsPath); err != nil {
