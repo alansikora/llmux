@@ -66,17 +66,19 @@ type Model struct {
 	deleteSessionWsPath string // workspace path when deleting a session
 
 	// Profile list (secondary view)
-	profileList list.Model
+	profileList      list.Model
+	profileListReady bool
 
 	// Project add form
 	projAddForm *huh.Form
 	projAddData projAddFormData
 
 	// Sessions view
-	sessionsList   list.Model
-	sessionsTarget string
-	sessionsPath   string
-	sessionsStatus string
+	sessionsList      list.Model
+	sessionsListReady bool
+	sessionsTarget    string
+	sessionsPath      string
+	sessionsStatus    string
 
 	// Sessions loading
 	sessionsLoading bool
@@ -136,6 +138,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loadingProject = ""
 		h, v := appStyle.GetFrameSize()
 		m.sessionsList = buildSessionsList(msg.sessions, msg.applied, msg.target, m.width-h, m.height-v-topBarHeight)
+		m.sessionsListReady = true
 		m.sessionsStatus = ""
 		if msg.wsPath != "" {
 			m.sessionsPath = msg.wsPath
@@ -178,10 +181,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		w, hgt := msg.Width-h, msg.Height-v-topBarHeight
 		m.list.SetSize(w, hgt)
 		// Also resize the profile and sessions lists so they re-layout if
-		// the terminal is resized while they're the active view. SetSize
-		// on a zero-value list is a harmless no-op.
-		m.profileList.SetSize(w, hgt)
-		m.sessionsList.SetSize(w, hgt)
+		// the terminal is resized while they're the active view. Guard with
+		// readiness flags: bubbles v1.0.0 list.Model panics in SetSize when
+		// the delegate is nil (zero-value case).
+		if m.profileListReady {
+			m.profileList.SetSize(w, hgt)
+		}
+		if m.sessionsListReady {
+			m.sessionsList.SetSize(w, hgt)
+		}
 		return m, nil
 
 	case tea.KeyMsg:
