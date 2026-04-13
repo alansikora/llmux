@@ -297,7 +297,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cfg.ApplyMarker = m.generalOptionsData.ApplyMarker
 			m.cfg.AutoMode = m.generalOptionsData.AutoMode
 			m.cfg.StatusLine = m.generalOptionsData.StatusLine
-			config.Save(m.cfg)
+			if err := config.Save(m.cfg); err != nil {
+				m.statusMsg = fmt.Sprintf("save error: %v", err)
+				m.state = stateProjectList
+				m.refreshProjectList()
+				return m, nil
+			}
 			if err := config.SyncAllProfileSettings(m.cfg); err != nil {
 				m.statusMsg = fmt.Sprintf("settings sync error: %v", err)
 			} else {
@@ -379,15 +384,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.deleteData.Confirm {
 				m.cfg.RemoveProfile(m.deleteTarget)
 				if err := config.Save(m.cfg); err != nil {
-					// Reload config from disk to restore the original state
-					if restored, loadErr := config.Load(); loadErr == nil {
-						m.cfg = restored
-					} else {
-						m.statusMsg = fmt.Sprintf("save error: %v; failed to reload config: %v", err, loadErr)
-						m.state = stateProfileList
-						m.refreshProfileList()
-						return m, nil
+					// Save failed — try to restore in-memory state from disk
+					// so the UI doesn't diverge from the actual config.
+					restored, loadErr := config.Load()
+					if loadErr != nil {
+						// Can't recover: in-memory cfg has the profile removed
+						// but disk may still have it (or be unreadable). Bail
+						// rather than act on a corrupt state.
+						m.statusMsg = fmt.Sprintf("save error: %v; failed to reload config: %v — quitting to avoid corruption", err, loadErr)
+						return m, tea.Quit
 					}
+					m.cfg = restored
 					m.statusMsg = fmt.Sprintf("save error: %v", err)
 				} else if err := config.RemoveSessionDir(m.deleteTarget); err != nil {
 					m.statusMsg = fmt.Sprintf("remove session dir error: %v", err)
@@ -506,9 +513,13 @@ func (m *Model) rightBar() string {
 func (m *Model) applyProfileAdd() {
 	name := m.profileAddData.Name
 	if err := m.cfg.AddProfile(name); err != nil {
+		m.statusMsg = fmt.Sprintf("add profile error: %v", err)
 		return
 	}
-	config.Save(m.cfg)
+	if err := config.Save(m.cfg); err != nil {
+		m.statusMsg = fmt.Sprintf("save error: %v", err)
+		return
+	}
 
 	// Sync settings to the new profile
 	m.statusMsg = ""
