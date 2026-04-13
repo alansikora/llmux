@@ -529,9 +529,13 @@ func (m *Model) applyProfileAdd() {
 	if err := config.Save(m.cfg); err != nil {
 		// Roll back the in-memory addition so m.cfg stays in sync with disk;
 		// otherwise a later save from anywhere else would silently persist
-		// this profile we never committed.
-		_ = m.cfg.RemoveProfile(name)
-		m.statusMsg = fmt.Sprintf("save error: %v", err)
+		// this profile we never committed. Surface any rollback failure so
+		// the user knows the in-memory state may have diverged.
+		if rbErr := m.cfg.RemoveProfile(name); rbErr != nil {
+			m.statusMsg = fmt.Sprintf("save error: %v; rollback failed: %v", err, rbErr)
+		} else {
+			m.statusMsg = fmt.Sprintf("save error: %v", err)
+		}
 		return
 	}
 
