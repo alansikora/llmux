@@ -22,9 +22,9 @@ func newGeneralOptionsForm(data *generalOptionsFormData, orig generalOptionsForm
 				Value(&data.ShortAlias),
 			confirmLeft().
 				TitleFunc(func() string {
-					return dirtyTitle("Add workspace apply marker?", data.ApplyMarker != orig.ApplyMarker)
+					return dirtyTitle("Add apply marker?", data.ApplyMarker != orig.ApplyMarker)
 				}, &data.ApplyMarker).
-				Description("When a worktree session is applied, create a .llmux-applied file in the workspace root.\nThis makes it visible in git status that changes from a worktree session are overlaid on your working tree.").
+				Description("When a worktree session is applied, create a .llmux-applied file at the project root.\nThis makes it visible in git status that changes from a worktree session are overlaid on your working tree.").
 				Affirmative("Enabled").
 				Negative("Disabled").
 				Value(&data.ApplyMarker),
@@ -40,7 +40,7 @@ func newGeneralOptionsForm(data *generalOptionsFormData, orig generalOptionsForm
 				TitleFunc(func() string {
 					return dirtyTitle("Enable status line?", data.StatusLine != orig.StatusLine)
 				}, &data.StatusLine).
-				Description("Add ccstatusline to all workspace settings, showing model, context, and git info in Claude Code.").
+				Description("Add ccstatusline to all profile settings, showing model, context, and git info in Claude Code.").
 				Affirmative("Enabled").
 				Negative("Disabled").
 				Value(&data.StatusLine),

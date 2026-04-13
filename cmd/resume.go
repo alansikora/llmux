@@ -16,7 +16,7 @@ import (
 var resumeCmd = &cobra.Command{
 	Use:   "resume <session-name-or-branch>",
 	Short: "Resume a worktree session by name or branch",
-	Long:  "Finds the worktree session, sets up the workspace environment, and launches claude --continue from the worktree directory.",
+	Long:  "Finds the worktree session, sets up the profile environment, and launches claude --continue from the worktree directory.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		query := args[0]
@@ -34,7 +34,7 @@ var resumeCmd = &cobra.Command{
 		result, err := cfg.Resolve(cwd)
 		if err != nil {
 			if errors.Is(err, config.ErrUnmapped) {
-				return fmt.Errorf("current directory is not mapped to any workspace; run \"llmux\" to configure one")
+				return fmt.Errorf("current directory is not mapped to any profile; run \"llmux\" to configure one")
 			}
 			return err
 		}
@@ -63,7 +63,7 @@ var resumeCmd = &cobra.Command{
 		}
 
 		os.MkdirAll(result.SessionDir, 0755) //nolint:errcheck
-		config.SyncWorkspaceSettings(cfg, result.WorkspaceName) //nolint:errcheck
+		config.SyncProfileSettings(cfg, result.ProfileName) //nolint:errcheck
 		commands.Ensure()
 
 		env := os.Environ()

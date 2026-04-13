@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>llmux - Workspace Manager for Claude Code | Isolated Sessions, Auth & Settings per Project</title>
-  <meta name="description" content="llmux is a workspace manager for Claude Code. Run multiple isolated sessions with separate auth, settings, history, and API keys per project. Automatic routing, git worktree sessions, interactive TUI. Open source CLI for macOS and Linux." />
-  <meta name="keywords" content="claude code, workspace manager, claude code sessions, claude code worktree, claude code multiple accounts, claude code CLI, AI coding tool, claude code workspace, session manager, llmux" />
-  <meta property="og:title" content="llmux - Workspace Manager for Claude Code" />
-  <meta property="og:description" content="Run multiple isolated Claude Code sessions with separate auth, settings, and history per project. Open source CLI with automatic routing and git worktree support." />
+  <title>llmux - Session Manager for Claude Code | Multiple Profiles, Isolated Auth & Settings per Project</title>
+  <meta name="description" content="llmux is a session manager for Claude Code. Run multiple isolated sessions with separate auth, settings, history, and API keys — bundled into reusable profiles and routed automatically per project. Git worktree sessions, interactive TUI. Open source CLI for macOS and Linux." />
+  <meta name="keywords" content="claude code, session manager, claude code profiles, claude code sessions, claude code worktree, claude code multiple accounts, claude code CLI, AI coding tool, claude code workspace, claude code project manager, llmux" />
+  <meta property="og:title" content="llmux - Session Manager for Claude Code" />
+  <meta property="og:description" content="Run multiple isolated Claude Code sessions with separate auth, settings, and history per project. Profiles group credentials, projects map directories, automatic routing — open source CLI with git worktree support." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://llmux.sh" />
   <meta property="og:site_name" content="llmux" />
   <!-- TODO: upgrade to summary_large_image once og:image / twitter:image are added -->
   <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content="llmux - Workspace Manager for Claude Code" />
-  <meta name="twitter:description" content="Isolated Claude Code sessions per project. Separate auth, settings, worktree sessions. Open source CLI." />
+  <meta name="twitter:title" content="llmux - Session Manager for Claude Code" />
+  <meta name="twitter:description" content="Isolated Claude Code sessions per project. Profiles for auth, projects for directories, worktree sessions. Open source CLI." />
   <link rel="canonical" href="https://llmux.sh" />
   <script type="application/ld+json">
   {
@@ -22,7 +22,7 @@
     "@type": "SoftwareApplication",
     "name": "llmux",
     "url": "https://llmux.sh",
-    "description": "Workspace manager for Claude Code. Run multiple isolated sessions with separate auth, settings, and history per project.",
+    "description": "Session manager for Claude Code. Run multiple isolated sessions with separate auth, settings, and history per project, grouped into reusable profiles.",
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "macOS, Linux",
     "offers": {
@@ -50,7 +50,7 @@
         "name": "What is llmux?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "llmux is an open-source workspace manager for Claude Code that lets you run multiple isolated sessions. Each workspace gets its own authentication, settings, history, and API keys. It automatically routes to the correct workspace based on your current directory."
+          "text": "llmux is an open-source session manager for Claude Code that lets you run multiple isolated sessions. Each profile bundles authentication, settings, history, and API keys, and each project directory is bound to a profile. llmux automatically routes to the correct profile based on your current directory."
         }
       },
       {
@@ -58,7 +58,7 @@
         "name": "How do I use multiple Claude Code accounts on one machine?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Install llmux and create separate workspaces for each account. Each workspace gets its own CLAUDE_CONFIG_DIR with independent authentication. Map your project directories to workspaces, and llmux automatically routes claude commands to the correct account based on where you are in your filesystem."
+          "text": "Install llmux and create a profile for each account. Each profile gets its own CLAUDE_CONFIG_DIR with independent authentication. Map your project directories to profiles, and llmux automatically routes claude commands to the correct account based on where you are in your filesystem."
         }
       },
       {
@@ -74,7 +74,7 @@
         "name": "Does llmux support git worktree sessions?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Yes. llmux can auto-pass --worktree per workspace. You can list, apply, revert, and resume worktree sessions from the TUI or CLI. The /llmux apply slash command brings a session's changes into the main workspace as uncommitted diffs."
+          "text": "Yes. llmux can auto-pass --worktree per profile. You can list, apply, revert, and resume worktree sessions from the TUI or CLI. The /llmux apply slash command brings a session's changes into your main working tree as uncommitted diffs."
         }
       }
     ]
@@ -161,9 +161,9 @@
   <section class="pt-20 pb-20 px-6">
     <div class="max-w-3xl mx-auto text-center">
       <p class="fade-up fade-up-1 font-mono font-bold text-2xl mb-6 tracking-tight">llmux</p>
-      <p class="fade-up fade-up-1 text-sm font-mono text-accent mb-4 tracking-wide uppercase">Workspace Manager for Claude Code</p>
+      <p class="fade-up fade-up-1 text-sm font-mono text-accent mb-4 tracking-wide uppercase">Session Manager for Claude Code</p>
       <h1 class="fade-up fade-up-2 text-4xl sm:text-5xl md:text-6xl font-bold leading-tight tracking-tight mb-6">
-        One machine.<br/><span class="shimmer">Many workspaces.</span>
+        One machine.<br/><span class="shimmer">Many profiles.</span>
       </h1>
       <p class="fade-up fade-up-3 text-lg text-muted max-w-xl mx-auto mb-10">
         Isolated auth, settings, and history per project. Automatic routing based on your directory. Just run <code class="font-mono text-white/80">claude</code> and it works.
@@ -204,31 +204,22 @@
             <span class="text-green-400">~</span> $ llmux list
           </div>
           <div class="mt-2">
-            <span class="text-emerald-400">●</span> personal
-          </div>
-          <div class="text-muted">
-            &nbsp;&nbsp;&nbsp;&nbsp;~/projects
+            <span class="text-emerald-400">●</span> api        <span class="text-muted">~/work/api        (work)</span>
           </div>
           <div class="mt-1">
-            <span class="text-emerald-400">●</span> work <span class="text-yellow-500/80">★</span>
-          </div>
-          <div class="text-muted">
-            &nbsp;&nbsp;&nbsp;&nbsp;~/work/api
-          </div>
-          <div class="text-muted">
-            &nbsp;&nbsp;&nbsp;&nbsp;~/work/frontend
+            <span class="text-white/40">○</span> client     <span class="text-muted">~/client          (client)</span>
           </div>
           <div class="mt-1">
-            <span class="text-white/40">○</span> client
+            <span class="text-emerald-400">●</span> frontend   <span class="text-muted">~/work/frontend   (work)</span>
           </div>
-          <div class="text-muted">
-            &nbsp;&nbsp;&nbsp;&nbsp;~/client
+          <div class="mt-1">
+            <span class="text-emerald-400">●</span> projects   <span class="text-muted">~/projects        (personal)</span>
           </div>
           <div class="mt-3 text-muted">
             <span class="text-green-400">~/work/api</span> $ claude<span class="cursor-blink text-white">_</span>
           </div>
           <div class="text-muted text-xs mt-1">
-            # resolves to "work" workspace automatically
+            # resolves to "work" profile automatically
           </div>
         </div>
       </div>
@@ -239,42 +230,42 @@
   <section id="features" class="pb-24 px-6">
     <div class="max-w-5xl mx-auto">
       <h2 class="text-2xl sm:text-3xl font-bold text-center mb-4 tracking-tight">Everything you need</h2>
-      <p class="text-muted text-center mb-12 max-w-lg mx-auto">Each workspace is a fully isolated Claude Code environment. Switch projects, not accounts.</p>
+      <p class="text-muted text-center mb-12 max-w-lg mx-auto">Each profile is a fully isolated Claude Code environment. Switch projects, not accounts.</p>
       <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div class="feature-card">
           <div class="text-accent text-xl mb-3">&#x2192;</div>
           <h3 class="font-semibold mb-2">Automatic routing</h3>
-          <p class="text-sm text-muted">Run <code class="font-mono text-white/70">claude</code> anywhere — no manual env vars or config. llmux resolves the right workspace from your current directory using longest-prefix matching.</p>
+          <p class="text-sm text-muted">Run <code class="font-mono text-white/70">claude</code> anywhere — no manual env vars or config. llmux resolves the right profile from your current directory using longest-prefix matching.</p>
         </div>
         <div class="feature-card">
           <div class="text-accent text-xl mb-3">&#x1F512;</div>
           <h3 class="font-semibold mb-2">Isolated sessions</h3>
-          <p class="text-sm text-muted">Separate auth, history, and settings per workspace. Each gets its own <code class="font-mono text-white/70">CLAUDE_CONFIG_DIR</code>.</p>
+          <p class="text-sm text-muted">Separate auth, history, and settings per profile. Each gets its own <code class="font-mono text-white/70">CLAUDE_CONFIG_DIR</code>.</p>
         </div>
         <div class="feature-card">
           <div class="text-accent text-xl mb-3">&#x1F4A1;</div>
-          <h3 class="font-semibold mb-2">Project-specific insights</h3>
-          <p class="text-sm text-muted">Run <code class="font-mono text-white/70">/insights</code> and get patterns from <em>that</em> workspace's history only. Same Anthropic account, specialized intelligence per project.</p>
+          <h3 class="font-semibold mb-2">Profile-specific insights</h3>
+          <p class="text-sm text-muted">Run <code class="font-mono text-white/70">/insights</code> and get patterns from <em>that</em> profile's history only. Same Anthropic account, specialized intelligence per profile.</p>
         </div>
         <div class="feature-card">
           <div class="text-accent text-xl mb-3">&#x1F333;</div>
           <h3 class="font-semibold mb-2">Worktree sessions</h3>
-          <p class="text-sm text-muted">Auto-pass <code class="font-mono text-white/70">--worktree</code> per workspace. List, apply, revert, and resume sessions from the TUI or CLI. Compatible with <a href="https://codecanary.sh" target="_blank" rel="noopener" class="text-accent hover:underline">CodeCanary</a> for AI code review on your diffs.</p>
+          <p class="text-sm text-muted">Auto-pass <code class="font-mono text-white/70">--worktree</code> per profile. List, apply, revert, and resume sessions from the TUI or CLI. Compatible with <a href="https://codecanary.sh" target="_blank" rel="noopener" class="text-accent hover:underline">CodeCanary</a> for AI code review on your diffs.</p>
         </div>
         <div class="feature-card">
           <div class="text-accent text-xl mb-3">&#x1F511;</div>
           <h3 class="font-semibold mb-2">Separate accounts</h3>
-          <p class="text-sm text-muted">Use different subscriptions and API keys per workspace. Personal account for side projects, work account for the day job.</p>
+          <p class="text-sm text-muted">Use different subscriptions and API keys per profile. Personal account for side projects, work account for the day job.</p>
         </div>
         <div class="feature-card">
           <div class="text-accent text-xl mb-3">&#x2F;</div>
           <h3 class="font-semibold mb-2">Slash commands</h3>
-          <p class="text-sm text-muted">Apply or revert worktree changes without leaving Claude Code. <code class="font-mono text-white/70">/llmux apply</code> brings your session's changes into the main workspace as uncommitted diffs.</p>
+          <p class="text-sm text-muted">Apply or revert worktree changes without leaving Claude Code. <code class="font-mono text-white/70">/llmux apply</code> brings your session's changes into your main working tree as uncommitted diffs.</p>
         </div>
         <div class="feature-card">
           <div class="text-accent text-xl mb-3">&#x2328;</div>
           <h3 class="font-semibold mb-2">Interactive TUI</h3>
-          <p class="text-sm text-muted">Manage workspaces, projects, options, and worktree sessions from a clean terminal UI.</p>
+          <p class="text-sm text-muted">Manage profiles, projects, options, and worktree sessions from a clean terminal UI.</p>
         </div>
         <div class="feature-card">
           <div class="text-accent text-xl mb-3">&#x1F41A;</div>
@@ -331,22 +322,22 @@
         <div class="flex gap-4">
           <div class="flex-shrink-0 w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center text-sm font-bold">1</div>
           <div>
-            <h3 class="font-semibold mb-1">Create workspaces</h3>
-            <p class="text-sm text-muted">Each workspace gets its own Claude config directory under <code class="font-mono text-white/70">~/.config/llmux/sessions/</code> with separate auth and settings.</p>
+            <h3 class="font-semibold mb-1">Create profiles</h3>
+            <p class="text-sm text-muted">Each profile gets its own Claude config directory under <code class="font-mono text-white/70">~/.config/llmux/sessions/</code> with separate auth and settings.</p>
           </div>
         </div>
         <div class="flex gap-4">
           <div class="flex-shrink-0 w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center text-sm font-bold">2</div>
           <div>
-            <h3 class="font-semibold mb-1">Map projects to workspaces</h3>
-            <p class="text-sm text-muted">Register directories to workspaces. <code class="font-mono text-white/70">~/work/api</code> goes to "work", <code class="font-mono text-white/70">~/personal</code> goes to "personal".</p>
+            <h3 class="font-semibold mb-1">Map projects to profiles</h3>
+            <p class="text-sm text-muted">Register directories to profiles. <code class="font-mono text-white/70">~/work/api</code> uses "work", <code class="font-mono text-white/70">~/personal</code> uses "personal".</p>
           </div>
         </div>
         <div class="flex gap-4">
           <div class="flex-shrink-0 w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center text-sm font-bold">3</div>
           <div>
             <h3 class="font-semibold mb-1">Just run <code class="font-mono">claude</code></h3>
-            <p class="text-sm text-muted">The shell wrapper calls <code class="font-mono text-white/70">llmux resolve</code>, finds the right workspace by longest-prefix match, and launches Claude with the correct config.</p>
+            <p class="text-sm text-muted">The shell wrapper calls <code class="font-mono text-white/70">llmux resolve</code>, finds the right profile by longest-prefix project match, and launches Claude with the correct config.</p>
           </div>
         </div>
       </div>
@@ -363,28 +354,28 @@
             <svg class="w-4 h-4 text-accent transition-transform group-open:rotate-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
             What is llmux?
           </summary>
-          <p class="text-sm text-muted mt-3 ml-6">llmux is an open-source workspace manager for Claude Code that lets you run multiple isolated sessions. Each workspace gets its own authentication, settings, history, and API keys. It automatically routes to the correct workspace based on your current directory.</p>
+          <p class="text-sm text-muted mt-3 ml-6">llmux is an open-source session manager for Claude Code that lets you run multiple isolated sessions. Each profile bundles authentication, settings, history, and API keys, and each project directory is bound to a profile. llmux automatically routes to the correct profile based on your current directory.</p>
         </details>
         <details class="group">
           <summary class="cursor-pointer font-semibold text-white/90 flex items-center gap-2">
             <svg class="w-4 h-4 text-accent transition-transform group-open:rotate-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
             How do I use multiple Claude Code accounts on one machine?
           </summary>
-          <p class="text-sm text-muted mt-3 ml-6">Create separate workspaces in llmux, each with its own authentication. Map your project directories to workspaces — for example, <code class="font-mono text-white/70">~/work</code> uses your company subscription and <code class="font-mono text-white/70">~/personal</code> uses your personal account. When you run <code class="font-mono text-white/70">claude</code>, llmux automatically resolves the correct workspace and auth based on your current directory.</p>
+          <p class="text-sm text-muted mt-3 ml-6">Create a profile for each account in llmux — each with its own authentication. Map your project directories to profiles — for example, <code class="font-mono text-white/70">~/work</code> uses your company subscription and <code class="font-mono text-white/70">~/personal</code> uses your personal account. When you run <code class="font-mono text-white/70">claude</code>, llmux automatically resolves the correct profile and auth based on your current directory.</p>
         </details>
         <details class="group">
           <summary class="cursor-pointer font-semibold text-white/90 flex items-center gap-2">
             <svg class="w-4 h-4 text-accent transition-transform group-open:rotate-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
             How is llmux different from Claude Squad, Nimbalyst, or CCManager?
           </summary>
-          <p class="text-sm text-muted mt-3 ml-6">llmux is not a session multiplexer or GUI wrapper — it's a workspace manager. The core problem it solves is isolation: separate auth, API keys, settings, history, and CLAUDE.md per project. Tools like Claude Squad focus on running multiple sessions in parallel via tmux. llmux operates at a lower level, routing every <code class="font-mono text-white/70">claude</code> invocation to the right isolated config directory. You can use llmux alongside those tools.</p>
+          <p class="text-sm text-muted mt-3 ml-6">llmux is not a session multiplexer or GUI wrapper — it's a session/profile manager. The core problem it solves is isolation: separate auth, API keys, settings, history, and CLAUDE.md per project. Tools like Claude Squad focus on running multiple sessions in parallel via tmux. llmux operates at a lower level, routing every <code class="font-mono text-white/70">claude</code> invocation to the right isolated config directory. You can use llmux alongside those tools.</p>
         </details>
         <details class="group">
           <summary class="cursor-pointer font-semibold text-white/90 flex items-center gap-2">
             <svg class="w-4 h-4 text-accent transition-transform group-open:rotate-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
             Does it work with worktree sessions?
           </summary>
-          <p class="text-sm text-muted mt-3 ml-6">Yes. llmux can auto-pass <code class="font-mono text-white/70">--worktree</code> per workspace, so every Claude session runs in its own isolated git worktree. You can list, apply, revert, and resume worktree sessions from the TUI or CLI. The <code class="font-mono text-white/70">/llmux apply</code> slash command merges a session's changes back to the main workspace as uncommitted diffs.</p>
+          <p class="text-sm text-muted mt-3 ml-6">Yes. llmux can auto-pass <code class="font-mono text-white/70">--worktree</code> per profile, so every Claude session runs in its own isolated git worktree. You can list, apply, revert, and resume worktree sessions from the TUI or CLI. The <code class="font-mono text-white/70">/llmux apply</code> slash command merges a session's changes back into your main working tree as uncommitted diffs.</p>
         </details>
         <details class="group">
           <summary class="cursor-pointer font-semibold text-white/90 flex items-center gap-2">
@@ -412,7 +403,7 @@
       <a href="https://codecanary.sh" target="_blank" rel="noopener noreferrer" class="text-muted hover:text-white transition-colors">CodeCanary</a>
       <a href="https://github.com/alansikora/llmux/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" class="text-muted hover:text-white transition-colors">MIT License</a>
     </div>
-    <p class="mt-3" style="color:#525252">llmux — open-source workspace manager for Claude Code. One machine, many workspaces.</p>
+    <p class="mt-3" style="color:#525252">llmux — open-source session manager for Claude Code. One machine, many profiles.</p>
   </footer>
 
 </body>

@@ -26,8 +26,8 @@ func rcFile(sh string) (string, error) {
 
 func snippet(bin string) string {
 	return fmt.Sprintf(`claude() {
-  # Pass-through for non-interactive subcommands — bypass workspace resolution
-  # entirely so these work even outside a configured workspace.
+  # Pass-through for non-interactive subcommands — bypass profile resolution
+  # entirely so these work even outside a configured profile.
   # The subcommand list is maintained in Go (llmux is-subcommand).
   local _llmux_first_pos=""
   for arg in "$@"; do
@@ -53,8 +53,8 @@ func snippet(bin string) string {
     %s register "$(pwd -P)" || return 1
     resolve_output="$(%s resolve "$(pwd -P)" -- "$@")" || return 1
   elif [ $resolve_status -ne 0 ]; then
-    echo "llmux: no workspace configured for $(pwd -P)" >&2
-    echo "Run 'llmux' to manage workspaces." >&2
+    echo "llmux: no profile configured for $(pwd -P)" >&2
+    echo "Run 'llmux' to manage projects." >&2
     return 1
   fi
   config_dir="$(echo "$resolve_output" | head -n1)"
@@ -80,8 +80,8 @@ func snippet(bin string) string {
 
 func fishSnippet(bin string) string {
 	return fmt.Sprintf(`function claude
-  # Pass-through for non-interactive subcommands — bypass workspace resolution
-  # entirely so these work even outside a configured workspace.
+  # Pass-through for non-interactive subcommands — bypass profile resolution
+  # entirely so these work even outside a configured profile.
   # The subcommand list is maintained in Go (llmux is-subcommand).
   set -l _llmux_first_pos ""
   for arg in $argv
@@ -106,8 +106,8 @@ func fishSnippet(bin string) string {
     %s register (pwd -P); or return 1
     set resolve_output (string split \n (%s resolve (pwd -P) -- $argv)); or return 1
   else if test $resolve_status -ne 0
-    echo "llmux: no workspace configured for "(pwd -P) >&2
-    echo "Run 'llmux' to manage workspaces." >&2
+    echo "llmux: no profile configured for "(pwd -P) >&2
+    echo "Run 'llmux' to manage projects." >&2
     return 1
   end
   set -l config_dir $resolve_output[1]

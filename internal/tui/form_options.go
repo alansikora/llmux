@@ -34,25 +34,25 @@ func formKeyMap() *huh.KeyMap {
 	return km
 }
 
-// Unified options form data for both workspace and project levels.
-// Workspace uses "enabled"/"disabled"; project adds "inherit".
+// Unified options form data for both profile and project levels.
+// Profile uses "enabled"/"disabled"; project adds "inherit".
 type optionsFormData struct {
 	Worktree           string // "inherit", "enabled", "disabled"
 	DisableAttribution string // "inherit", "enabled", "disabled"
 }
 
-// wsDefaults holds the workspace-level defaults shown in "Inherit" labels.
-type wsDefaults struct {
+// profileDefaults holds the profile-level defaults shown in "Inherit" labels.
+type profileDefaults struct {
 	Worktree           bool
 	DisableAttribution bool
 }
 
-func selectOptions(label string, allowInherit bool, wsDefault *bool) []huh.Option[string] {
+func selectOptions(label string, allowInherit bool, profileDefault *bool) []huh.Option[string] {
 	var opts []huh.Option[string]
 	if allowInherit {
 		inheritLabel := label
-		if wsDefault != nil {
-			if *wsDefault {
+		if profileDefault != nil {
+			if *profileDefault {
 				inheritLabel += " (currently: enabled)"
 			} else {
 				inheritLabel += " (currently: disabled)"
@@ -67,7 +67,7 @@ func selectOptions(label string, allowInherit bool, wsDefault *bool) []huh.Optio
 	return opts
 }
 
-func newOptionsForm(data *optionsFormData, orig optionsFormData, allowInherit bool, defaults *wsDefaults) *huh.Form {
+func newOptionsForm(data *optionsFormData, orig optionsFormData, allowInherit bool, defaults *profileDefaults) *huh.Form {
 	var worktreeDefault, attrDefault *bool
 	if defaults != nil {
 		worktreeDefault = &defaults.Worktree
@@ -81,14 +81,14 @@ func newOptionsForm(data *optionsFormData, orig optionsFormData, allowInherit bo
 					return dirtyTitle("Disable commit/PR attributions?", data.DisableAttribution != orig.DisableAttribution)
 				}, &data.DisableAttribution).
 				Description("Removes \"Made with Claude Code\" from commits and PRs").
-				Options(selectOptions("Inherit from workspace", allowInherit, attrDefault)...).
+				Options(selectOptions("Inherit from profile", allowInherit, attrDefault)...).
 				Value(&data.DisableAttribution),
 			huh.NewSelect[string]().
 				TitleFunc(func() string {
 					return dirtyTitle("Always use worktree?", data.Worktree != orig.Worktree)
 				}, &data.Worktree).
 				Description("Runs claude --worktree by default (bypass with --no-worktree)").
-				Options(selectOptions("Inherit from workspace", allowInherit, worktreeDefault)...).
+				Options(selectOptions("Inherit from profile", allowInherit, worktreeDefault)...).
 				Value(&data.Worktree),
 		),
 	).WithKeyMap(formKeyMap())

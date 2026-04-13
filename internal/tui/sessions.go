@@ -151,7 +151,7 @@ func unapplySessionCmd(wsPath string) tea.Cmd {
 	}
 }
 
-func buildSessionsList(sessions []worktree.Session, applied string, width, height int) list.Model {
+func buildSessionsList(sessions []worktree.Session, applied, projectName string, width, height int) list.Model {
 	items := make([]list.Item, len(sessions))
 	for i, s := range sessions {
 		items[i] = sessionItem{
@@ -169,7 +169,11 @@ func buildSessionsList(sessions []worktree.Session, applied string, width, heigh
 	delegate := list.NewDefaultDelegate()
 	delegate.SetHeight(3)
 	l := list.New(items, delegate, width, height)
-	l.Title = "Worktree Sessions"
+	if projectName != "" {
+		l.Title = "Sessions — " + projectName
+	} else {
+		l.Title = "Sessions"
+	}
 	l.SetShowStatusBar(true)
 	l.SetShowHelp(true)
 	l.AdditionalShortHelpKeys = func() []key.Binding {
@@ -177,7 +181,7 @@ func buildSessionsList(sessions []worktree.Session, applied string, width, heigh
 			key.NewBinding(key.WithKeys("a", "enter"), key.WithHelp("a/enter", "apply")),
 			key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "unapply")),
 			key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "copy path")),
-			key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete")),
+			key.NewBinding(key.WithKeys("d", "x"), key.WithHelp("d", "delete")),
 			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
 		}
 	}
@@ -231,10 +235,14 @@ func updateSessions(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 					return clipboardResultMsg{err: err, path: path}
 				}
 			}
-		case "d":
+		case "d", "x":
 			if item, ok := m.sessionsList.SelectedItem().(sessionItem); ok {
-				m.sessionsStatus = fmt.Sprintf("deleting %s...", item.name)
-				return m, deleteSessionCmd(item.workspacePath, item.name, false)
+				m.deleteTarget = item.name
+				m.deleteSessionWsPath = item.workspacePath
+				m.deleteData = deleteFormData{}
+				m.deleteForm = newDeleteForm("session", item.name, &m.deleteData)
+				m.state = stateSessionDeleting
+				return m, m.deleteForm.Init()
 			}
 		}
 	}

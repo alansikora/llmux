@@ -26,8 +26,8 @@ func DisplayVersion() string {
 
 var rootCmd = &cobra.Command{
 	Use:   "llmux",
-	Short: "Claude workspace manager",
-	Long:  "Manage multiple Claude Code workspaces with isolated sessions.",
+	Short: "Claude Code session manager",
+	Long:  "Manage multiple Claude Code profiles with isolated sessions per project.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {

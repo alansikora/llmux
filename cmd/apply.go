@@ -35,16 +35,8 @@ var applyCmd = &cobra.Command{
 			sessionName = detected
 		}
 
-		var wsArgs []string
-		if applyWorkspace != "" {
-			wsArgs = []string{applyWorkspace}
-		}
-		_, _, err = resolveWorkspace(cfg, wsArgs)
-		if err != nil {
-			return err
-		}
-
-		// Prefer git repo root for finding sessions
+		// Sessions live under the git main worktree root; they're not scoped
+		// by profile. `ResolveSessionsPath` walks up from cwd to find it.
 		sessionsPath := worktree.ResolveSessionsPath(cwd)
 
 		if err := worktree.Apply(sessionsPath, sessionName, cfg.ApplyMarker); err != nil {
@@ -56,9 +48,6 @@ var applyCmd = &cobra.Command{
 	},
 }
 
-var applyWorkspace string
-
 func init() {
-	applyCmd.Flags().StringVarP(&applyWorkspace, "workspace", "w", "", "workspace name")
 	rootCmd.AddCommand(applyCmd)
 }

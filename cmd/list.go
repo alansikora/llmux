@@ -2,6 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"path/filepath"
+	"sort"
+	"strings"
 
 	"github.com/allskar/llmux/internal/config"
 	"github.com/spf13/cobra"
@@ -9,33 +12,40 @@ import (
 
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List all workspaces and projects",
+	Short: "List all projects with their profile and auth status",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {
 			return err
 		}
 
-		if len(cfg.Workspaces) == 0 {
-			fmt.Println("No workspaces configured. Run 'llmux' to add one.")
+		if len(cfg.Projects) == 0 {
+			fmt.Println("No projects configured. Run 'llmux' to add one.")
 			return nil
 		}
 
-		for _, ws := range cfg.Workspaces {
+		// Sort projects alphabetically by base name (case-insensitive)
+		sorted := make([]config.Project, len(cfg.Projects))
+		copy(sorted, cfg.Projects)
+		sort.Slice(sorted, func(i, j int) bool {
+			return strings.ToLower(filepath.Base(sorted[i].Path)) < strings.ToLower(filepath.Base(sorted[j].Path))
+		})
+
+		// Determine column width for alignment
+		maxName := 0
+		for _, p := range sorted {
+			if n := len(filepath.Base(p.Path)); n > maxName {
+				maxName = n
+			}
+		}
+
+		for _, p := range sorted {
 			auth := "○"
-			if config.IsAuthenticated(ws.Name) {
+			if config.IsAuthenticated(p.Profile) {
 				auth = "●"
 			}
-			def := ""
-			if ws.Name == cfg.DefaultWorkspace {
-				def = " ★"
-			}
-			fmt.Printf("%s %s%s\n", auth, ws.Name, def)
-
-			projects := cfg.ProjectsForWorkspace(ws.Name)
-			for _, p := range projects {
-				fmt.Printf("    %s\n", p.Path)
-			}
+			name := filepath.Base(p.Path)
+			fmt.Printf("%s %-*s  %s  (%s)\n", auth, maxName, name, p.Path, p.Profile)
 		}
 		return nil
 	},

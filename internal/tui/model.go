@@ -10,22 +10,22 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
-	"github.com/charmbracelet/lipgloss"
 )
 
 type state int
 
 const (
-	stateWorkspaceList    state = iota
-	stateWorkspaceAdding        // Add workspace (name + API key)
-	stateWorkspaceOptions       // Edit workspace settings
-	stateWorkspaceDeleting      // Delete workspace confirmation
-	stateProjectList            // List projects for a workspace
-	stateProjectAdding          // Add project to workspace
-	stateProjectOptions         // Edit project overrides
-	stateSessions               // Worktree sessions (per project)
-	stateGeneralOptions         // Global config options
-	stateWorkspaceRenaming      // Rename workspace
+	stateProjectList     state = iota // MAIN VIEW: flat alphabetical list of all projects
+	stateProjectAdding                // Add project (path + profile picker)
+	stateProjectOptions               // Edit project overrides
+	stateSessions                     // Worktree sessions (per project)
+	stateSessionDeleting              // Delete session confirmation (destructive)
+	stateGeneralOptions               // Global config options
+	stateProfileList                  // Profile management (secondary view)
+	stateProfileAdding                // Add profile
+	stateProfileRenaming              // Rename profile
+	stateProfileOptions               // Edit profile settings
+	stateProfileDeleting              // Delete profile confirmation
 )
 
 // updateCheckMsg is sent when the async update check completes.
@@ -36,37 +36,37 @@ type updateCheckMsg struct {
 type Model struct {
 	cfg           *config.Config
 	version       string
-	latestVersion string       // set if a newer version is available
+	latestVersion string        // set if a newer version is available
 	updateCh      <-chan string // receives result from async update check
 	state         state
 
-	list   list.Model // workspace list (main view)
+	list   list.Model // project list (main view)
 	width  int
 	height int
 
-	// Workspace add form
-	wsAddForm *huh.Form
-	wsAddData wsAddFormData
+	// Profile add form
+	profileAddForm *huh.Form
+	profileAddData profileAddFormData
 
-	// Workspace rename form
-	wsRenameForm   *huh.Form
-	wsRenameData   wsRenameFormData
-	wsRenameTarget string // original workspace name
+	// Profile rename form
+	profileRenameForm   *huh.Form
+	profileRenameData   profileRenameFormData
+	profileRenameTarget string // original profile name
 
-	// Unified options form (used for both workspace and project)
-	optionsForm   *huh.Form
-	optionsData   optionsFormData
-	wsOptionsTarget   string // workspace name (when editing workspace)
-	projOptionsTarget string // project path (when editing project)
+	// Unified options form (used for both profile and project)
+	optionsForm          *huh.Form
+	optionsData          optionsFormData
+	profileOptionsTarget string // profile name (when editing profile)
+	projOptionsTarget    string // project path (when editing project)
 
-	// Workspace delete
-	deleteForm   *huh.Form
-	deleteData   deleteFormData
-	deleteTarget string
+	// Delete confirmation (generic, used for profile + session)
+	deleteForm          *huh.Form
+	deleteData          deleteFormData
+	deleteTarget        string
+	deleteSessionWsPath string // workspace path when deleting a session
 
-	// Project list (per workspace)
-	projectList    list.Model
-	projectsTarget string // workspace name
+	// Profile list (secondary view)
+	profileList list.Model
 
 	// Project add form
 	projAddForm *huh.Form
@@ -87,7 +87,7 @@ type Model struct {
 	generalOptionsForm *huh.Form
 	generalOptionsData generalOptionsFormData
 
-	// Status message shown in workspace list view
+	// Status message shown in project list view
 	statusMsg string
 }
 
@@ -96,17 +96,21 @@ func NewModel(cfg *config.Config, version string, updateCh <-chan string) *Model
 		cfg:      cfg,
 		version:  version,
 		updateCh: updateCh,
-		state:    stateWorkspaceList,
+		state:    stateProjectList,
 	}
 }
 
 func (m *Model) Init() tea.Cmd {
-	m.list = buildWorkspaceList(m.cfg, m.version, 80, 20)
+	m.list = buildProjectList(m.cfg, 80, 20)
 	m.spinner = spinner.New(spinner.WithSpinner(spinner.Dot))
+	// Kick off the spinner ticker so any loading state entered during or
+	// shortly after Init animates. The TickMsg handler ignores ticks when
+	// no loading is in progress, so this is a no-op at rest.
+	cmds := []tea.Cmd{m.spinner.Tick}
 	if m.updateCh != nil {
-		return waitForUpdateCheck(m.updateCh)
+		cmds = append(cmds, waitForUpdateCheck(m.updateCh))
 	}
-	return nil
+	return tea.Batch(cmds...)
 }
 
 func waitForUpdateCheck(ch <-chan string) tea.Cmd {
@@ -131,7 +135,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sessionsLoading = false
 		m.loadingProject = ""
 		h, v := appStyle.GetFrameSize()
-		m.sessionsList = buildSessionsList(msg.sessions, msg.applied, m.width-h, m.height-v-headerHeight)
+		m.sessionsList = buildSessionsList(msg.sessions, msg.applied, msg.target, m.width-h, m.height-v-topBarHeight)
 		m.sessionsStatus = ""
 		if msg.wsPath != "" {
 			m.sessionsPath = msg.wsPath
@@ -171,7 +175,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		h, v := appStyle.GetFrameSize()
-		m.list.SetSize(msg.Width-h, msg.Height-v-7)
+		w, hgt := msg.Width-h, msg.Height-v-topBarHeight
+		m.list.SetSize(w, hgt)
+		// Also resize the profile and sessions lists so they re-layout if
+		// the terminal is resized while they're the active view. SetSize
+		// on a zero-value list is a harmless no-op.
+		m.profileList.SetSize(w, hgt)
+		m.sessionsList.SetSize(w, hgt)
 		return m, nil
 
 	case tea.KeyMsg:
@@ -180,28 +190,30 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if msg.String() == "esc" {
 			switch m.state {
-			case stateWorkspaceList:
-				// Don't handle esc at top level
 			case stateProjectList:
-				m.state = stateWorkspaceList
-				m.refreshWorkspaceList()
-				return m, nil
+				// Top level: esc quits.
+				return m, tea.Quit
 			case stateSessions:
-				// Go back to project list
 				m.sessionsLoading = false
-				projects := m.cfg.ProjectsForWorkspace(m.projectsTarget)
-				h, v := appStyle.GetFrameSize()
-				m.projectList = buildProjectList(projects, m.projectsTarget, m.width-h, m.height-v-headerHeight)
+				m.loadingProject = ""
 				m.state = stateProjectList
+				m.refreshProjectList()
+				return m, nil
+			case stateProfileList:
+				m.state = stateProjectList
+				m.refreshProjectList()
+				return m, nil
+			case stateSessionDeleting:
+				m.state = stateSessions
 				return m, nil
 			default:
 				m.sessionsLoading = false
 				// For forms, go back to appropriate parent
 				switch m.state {
-				case stateWorkspaceAdding, stateWorkspaceRenaming, stateWorkspaceOptions, stateWorkspaceDeleting, stateGeneralOptions:
-					m.state = stateWorkspaceList
-					m.refreshWorkspaceList()
-				case stateProjectAdding, stateProjectOptions:
+				case stateProfileAdding, stateProfileRenaming, stateProfileOptions, stateProfileDeleting:
+					m.state = stateProfileList
+					m.refreshProfileList()
+				case stateProjectAdding, stateProjectOptions, stateGeneralOptions:
 					m.state = stateProjectList
 					m.refreshProjectList()
 				}
@@ -211,93 +223,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch m.state {
-	case stateWorkspaceList:
-		return updateWorkspaceList(m, msg)
-
-	case stateWorkspaceAdding:
-		form, cmd := m.wsAddForm.Update(msg)
-		if f, ok := form.(*huh.Form); ok {
-			m.wsAddForm = f
-		}
-		if m.wsAddForm.State == huh.StateCompleted {
-			m.applyWsAdd()
-			m.state = stateWorkspaceList
-			m.refreshWorkspaceList()
-			return m, nil
-		}
-		if m.wsAddForm.State == huh.StateAborted {
-			m.state = stateWorkspaceList
-			return m, nil
-		}
-		return m, cmd
-
-	case stateWorkspaceRenaming:
-		form, cmd := m.wsRenameForm.Update(msg)
-		if f, ok := form.(*huh.Form); ok {
-			m.wsRenameForm = f
-		}
-		if m.wsRenameForm.State == huh.StateCompleted {
-			m.applyWsRename()
-			m.state = stateWorkspaceList
-			m.refreshWorkspaceList()
-			return m, nil
-		}
-		if m.wsRenameForm.State == huh.StateAborted {
-			m.state = stateWorkspaceList
-			return m, nil
-		}
-		return m, cmd
-
-	case stateWorkspaceOptions:
-		form, cmd := m.optionsForm.Update(msg)
-		if f, ok := form.(*huh.Form); ok {
-			m.optionsForm = f
-		}
-		if m.optionsForm.State == huh.StateCompleted {
-			m.applyWsOptions(m.wsOptionsTarget)
-			m.state = stateWorkspaceList
-			m.refreshWorkspaceList()
-			return m, nil
-		}
-		if m.optionsForm.State == huh.StateAborted {
-			m.state = stateWorkspaceList
-			return m, nil
-		}
-		return m, cmd
-
-	case stateWorkspaceDeleting:
-		form, cmd := m.deleteForm.Update(msg)
-		if f, ok := form.(*huh.Form); ok {
-			m.deleteForm = f
-		}
-		if m.deleteForm.State == huh.StateCompleted {
-			if m.deleteData.Confirm {
-				m.cfg.RemoveWorkspace(m.deleteTarget)
-				if err := config.Save(m.cfg); err != nil {
-					// Reload config from disk to restore the original state
-					if restored, loadErr := config.Load(); loadErr == nil {
-						m.cfg = restored
-					} else {
-						m.statusMsg = fmt.Sprintf("save error: %v; failed to reload config: %v", err, loadErr)
-						m.state = stateWorkspaceList
-						m.refreshWorkspaceList()
-						return m, nil
-					}
-					m.statusMsg = fmt.Sprintf("save error: %v", err)
-				} else if err := config.RemoveSessionDir(m.deleteTarget); err != nil {
-					m.statusMsg = fmt.Sprintf("remove session dir error: %v", err)
-				}
-			}
-			m.state = stateWorkspaceList
-			m.refreshWorkspaceList()
-			return m, nil
-		}
-		if m.deleteForm.State == huh.StateAborted {
-			m.state = stateWorkspaceList
-			return m, nil
-		}
-		return m, cmd
-
 	case stateProjectList:
 		return updateProjectList(m, msg)
 
@@ -340,28 +265,158 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case stateSessions:
 		return updateSessions(m, msg)
 
+	case stateSessionDeleting:
+		form, cmd := m.deleteForm.Update(msg)
+		if f, ok := form.(*huh.Form); ok {
+			m.deleteForm = f
+		}
+		if m.deleteForm.State == huh.StateCompleted {
+			if m.deleteData.Confirm {
+				name := m.deleteTarget
+				wsPath := m.deleteSessionWsPath
+				m.sessionsStatus = fmt.Sprintf("deleting %s...", name)
+				m.state = stateSessions
+				return m, deleteSessionCmd(wsPath, name, false)
+			}
+			m.state = stateSessions
+			return m, nil
+		}
+		if m.deleteForm.State == huh.StateAborted {
+			m.state = stateSessions
+			return m, nil
+		}
+		return m, cmd
+
 	case stateGeneralOptions:
 		form, cmd := m.generalOptionsForm.Update(msg)
 		if f, ok := form.(*huh.Form); ok {
 			m.generalOptionsForm = f
 		}
 		if m.generalOptionsForm.State == huh.StateCompleted {
+			// Snapshot the previous values so we can roll back if the write
+			// fails and keep m.cfg in sync with disk.
+			prevAlias := m.cfg.ShortAlias
+			prevApply := m.cfg.ApplyMarker
+			prevAuto := m.cfg.AutoMode
+			prevStatus := m.cfg.StatusLine
 			m.cfg.ShortAlias = m.generalOptionsData.ShortAlias
 			m.cfg.ApplyMarker = m.generalOptionsData.ApplyMarker
 			m.cfg.AutoMode = m.generalOptionsData.AutoMode
 			m.cfg.StatusLine = m.generalOptionsData.StatusLine
-			config.Save(m.cfg)
-			if err := config.SyncAllWorkspaceSettings(m.cfg); err != nil {
+			if err := config.Save(m.cfg); err != nil {
+				m.cfg.ShortAlias = prevAlias
+				m.cfg.ApplyMarker = prevApply
+				m.cfg.AutoMode = prevAuto
+				m.cfg.StatusLine = prevStatus
+				m.statusMsg = fmt.Sprintf("save error: %v", err)
+				m.state = stateProjectList
+				m.refreshProjectList()
+				return m, nil
+			}
+			if err := config.SyncAllProfileSettings(m.cfg); err != nil {
 				m.statusMsg = fmt.Sprintf("settings sync error: %v", err)
 			} else {
 				m.statusMsg = ""
 			}
-			m.state = stateWorkspaceList
-			m.refreshWorkspaceList()
+			m.state = stateProjectList
+			m.refreshProjectList()
 			return m, nil
 		}
 		if m.generalOptionsForm.State == huh.StateAborted {
-			m.state = stateWorkspaceList
+			m.state = stateProjectList
+			return m, nil
+		}
+		return m, cmd
+
+	case stateProfileList:
+		return updateProfileList(m, msg)
+
+	case stateProfileAdding:
+		form, cmd := m.profileAddForm.Update(msg)
+		if f, ok := form.(*huh.Form); ok {
+			m.profileAddForm = f
+		}
+		if m.profileAddForm.State == huh.StateCompleted {
+			m.applyProfileAdd()
+			m.state = stateProfileList
+			m.refreshProfileList()
+			return m, nil
+		}
+		if m.profileAddForm.State == huh.StateAborted {
+			m.state = stateProfileList
+			m.refreshProfileList()
+			return m, nil
+		}
+		return m, cmd
+
+	case stateProfileRenaming:
+		form, cmd := m.profileRenameForm.Update(msg)
+		if f, ok := form.(*huh.Form); ok {
+			m.profileRenameForm = f
+		}
+		if m.profileRenameForm.State == huh.StateCompleted {
+			m.applyProfileRename()
+			m.state = stateProfileList
+			m.refreshProfileList()
+			return m, nil
+		}
+		if m.profileRenameForm.State == huh.StateAborted {
+			m.state = stateProfileList
+			m.refreshProfileList()
+			return m, nil
+		}
+		return m, cmd
+
+	case stateProfileOptions:
+		form, cmd := m.optionsForm.Update(msg)
+		if f, ok := form.(*huh.Form); ok {
+			m.optionsForm = f
+		}
+		if m.optionsForm.State == huh.StateCompleted {
+			m.applyProfileOptions(m.profileOptionsTarget)
+			m.state = stateProfileList
+			m.refreshProfileList()
+			return m, nil
+		}
+		if m.optionsForm.State == huh.StateAborted {
+			m.state = stateProfileList
+			m.refreshProfileList()
+			return m, nil
+		}
+		return m, cmd
+
+	case stateProfileDeleting:
+		form, cmd := m.deleteForm.Update(msg)
+		if f, ok := form.(*huh.Form); ok {
+			m.deleteForm = f
+		}
+		if m.deleteForm.State == huh.StateCompleted {
+			if m.deleteData.Confirm {
+				m.cfg.RemoveProfile(m.deleteTarget)
+				if err := config.Save(m.cfg); err != nil {
+					// Save failed — try to restore in-memory state from disk
+					// so the UI doesn't diverge from the actual config.
+					restored, loadErr := config.Load()
+					if loadErr != nil {
+						// Can't recover: in-memory cfg has the profile removed
+						// but disk may still have it (or be unreadable). Bail
+						// rather than act on a corrupt state.
+						m.statusMsg = fmt.Sprintf("save error: %v; failed to reload config: %v — quitting to avoid corruption", err, loadErr)
+						return m, tea.Quit
+					}
+					m.cfg = restored
+					m.statusMsg = fmt.Sprintf("save error: %v", err)
+				} else if err := config.RemoveSessionDir(m.deleteTarget); err != nil {
+					m.statusMsg = fmt.Sprintf("remove session dir error: %v", err)
+				}
+			}
+			m.state = stateProfileList
+			m.refreshProfileList()
+			return m, nil
+		}
+		if m.deleteForm.State == huh.StateAborted {
+			m.state = stateProfileList
+			m.refreshProfileList()
 			return m, nil
 		}
 		return m, cmd
@@ -371,75 +426,135 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) View() string {
-	var content string
+	// Top bar: breadcrumb on the left, llmux version (+ update notice) on the right.
+	h, _ := appStyle.GetFrameSize()
+	header := topBar(m.width-h, m.leftBar(), m.rightBar()) + "\n\n"
+
+	var body string
+	saveHint := "\n" + hintStyle.Render("enter to save · esc to cancel")
 
 	switch m.state {
-	case stateWorkspaceList:
-		headerParts := logoStyle.Render(logo) + "  " + versionStyle.Render(m.version)
-		if m.latestVersion != "" {
-			headerParts += "  " + updateStyle.Render(m.latestVersion+" available — run llmux upgrade")
-		}
-		header := headerParts + "\n\n"
-		content = header + m.list.View()
-		if m.statusMsg != "" {
-			content += "\n" + statusBarStyle.Render(m.statusMsg)
-		}
-	case stateWorkspaceAdding:
-		content = titleStyle.Render("Add Workspace") + "\n\n" + m.wsAddForm.View()
-	case stateWorkspaceRenaming:
-		content = titleStyle.Render("Rename: "+m.wsRenameTarget) + "\n\n" + m.wsRenameForm.View() + "\n" + hintStyle.Render("enter to save · esc to cancel")
-	case stateWorkspaceOptions:
-		content = titleStyle.Render("Options: "+m.wsOptionsTarget) + "\n\n" + m.optionsForm.View() + "\n" + hintStyle.Render("enter to save · esc to cancel")
-	case stateWorkspaceDeleting:
-		content = m.deleteForm.View()
 	case stateProjectList:
-		content = m.projectList.View()
-	case stateProjectAdding:
-		content = titleStyle.Render("Add Project to "+m.projectsTarget) + "\n\n" + m.projAddForm.View()
-	case stateProjectOptions:
-		content = titleStyle.Render("Project Options: "+filepath.Base(m.projOptionsTarget)) + "\n\n" + m.optionsForm.View() + "\n" + hintStyle.Render("enter to save · esc to cancel")
-	case stateSessions:
-		status := ""
-		if m.sessionsStatus != "" {
-			status = "\n" + statusBarStyle.Render(m.sessionsStatus)
+		body = m.list.View()
+		if !m.sessionsLoading && m.statusMsg != "" {
+			body += "\n" + statusBarStyle.Render(m.statusMsg)
 		}
-		content = m.sessionsList.View() + status
+	case stateProjectAdding:
+		body = m.projAddForm.View() + saveHint
+	case stateProjectOptions:
+		body = m.optionsForm.View() + saveHint
+	case stateSessions:
+		body = m.sessionsList.View()
+		if m.sessionsStatus != "" {
+			body += "\n" + statusBarStyle.Render(m.sessionsStatus)
+		} else if m.statusMsg != "" {
+			body += "\n" + statusBarStyle.Render(m.statusMsg)
+		}
+	case stateSessionDeleting:
+		body = m.deleteForm.View()
 	case stateGeneralOptions:
-		content = titleStyle.Render("General Options") + "\n\n" + m.generalOptionsForm.View() + "\n" + hintStyle.Render("enter to save · esc to cancel")
+		body = m.generalOptionsForm.View() + saveHint
+	case stateProfileList:
+		body = m.profileList.View()
+		if m.statusMsg != "" {
+			body += "\n" + statusBarStyle.Render(m.statusMsg)
+		}
+	case stateProfileAdding:
+		body = m.profileAddForm.View() + saveHint
+	case stateProfileRenaming:
+		body = m.profileRenameForm.View() + saveHint
+	case stateProfileOptions:
+		body = m.optionsForm.View() + saveHint
+	case stateProfileDeleting:
+		body = m.deleteForm.View()
 	}
 
-	return appStyle.Render(lipgloss.Place(
-		m.width, m.height,
-		lipgloss.Left, lipgloss.Top,
-		content,
-	))
+	return appStyle.Render(header + body)
+}
+
+// leftBar builds the location breadcrumb for the current state.
+func (m *Model) leftBar() string {
+	// While sessions are loading from the project list, preview the
+	// destination breadcrumb with a spinner suffix so the user sees
+	// immediate feedback without losing context of the source list.
+	if m.state == stateProjectList && m.sessionsLoading {
+		projName := filepath.Base(m.loadingProject)
+		return breadcrumb("Projects", projName, "Sessions") + "  " +
+			hintStyle.Render(m.spinner.View()+" loading…")
+	}
+	switch m.state {
+	case stateProjectList:
+		return breadcrumb("Projects")
+	case stateProjectAdding:
+		return breadcrumb("Projects", "Add project")
+	case stateProjectOptions:
+		return breadcrumb("Projects", filepath.Base(m.projOptionsTarget), "Options")
+	case stateSessions:
+		return breadcrumb("Projects", m.sessionsTarget, "Sessions")
+	case stateSessionDeleting:
+		return breadcrumb("Projects", m.sessionsTarget, "Sessions", m.deleteTarget, "Delete")
+	case stateGeneralOptions:
+		return breadcrumb("Projects", "General options")
+	case stateProfileList:
+		return breadcrumb("Projects", "Profiles")
+	case stateProfileAdding:
+		return breadcrumb("Projects", "Profiles", "Add profile")
+	case stateProfileRenaming:
+		return breadcrumb("Projects", "Profiles", m.profileRenameTarget, "Rename")
+	case stateProfileOptions:
+		return breadcrumb("Projects", "Profiles", m.profileOptionsTarget, "Options")
+	case stateProfileDeleting:
+		return breadcrumb("Projects", "Profiles", m.deleteTarget, "Delete")
+	}
+	return ""
+}
+
+// rightBar builds the app-name + version + optional update indicator.
+func (m *Model) rightBar() string {
+	out := appNameStyle.Render("llmux") + " " + versionStyle.Render(m.version)
+	if m.latestVersion != "" {
+		out += "  " + updateStyle.Render(m.latestVersion+" available")
+	}
+	return out
 }
 
 // --- Apply helpers ---
 
-func (m *Model) applyWsAdd() {
-	name := m.wsAddData.Name
-	if err := m.cfg.AddWorkspace(name); err != nil {
+func (m *Model) applyProfileAdd() {
+	name := m.profileAddData.Name
+	if err := m.cfg.AddProfile(name); err != nil {
+		m.statusMsg = fmt.Sprintf("add profile error: %v", err)
 		return
 	}
-	config.Save(m.cfg)
+	if err := config.Save(m.cfg); err != nil {
+		// Roll back the in-memory addition so m.cfg stays in sync with disk;
+		// otherwise a later save from anywhere else would silently persist
+		// this profile we never committed. Surface any rollback failure so
+		// the user knows the in-memory state may have diverged.
+		if rbErr := m.cfg.RemoveProfile(name); rbErr != nil {
+			m.statusMsg = fmt.Sprintf("save error: %v; rollback failed: %v", err, rbErr)
+		} else {
+			m.statusMsg = fmt.Sprintf("save error: %v", err)
+		}
+		return
+	}
 
-	// Sync settings to the new workspace
+	// Sync settings to the new profile
 	m.statusMsg = ""
-	if err := config.SyncWorkspaceSettings(m.cfg, name); err != nil {
+	if err := config.SyncProfileSettings(m.cfg, name); err != nil {
 		m.statusMsg = fmt.Sprintf("settings sync error: %v", err)
 	}
 }
 
-func (m *Model) applyWsRename() {
-	oldName := m.wsRenameTarget
-	newName := strings.TrimSpace(m.wsRenameData.Name)
-	if err := m.cfg.RenameWorkspace(oldName, newName); err != nil {
+func (m *Model) applyProfileRename() {
+	oldName := m.profileRenameTarget
+	newName := strings.TrimSpace(m.profileRenameData.Name)
+	if err := m.cfg.RenameProfile(oldName, newName); err != nil {
 		m.statusMsg = fmt.Sprintf("rename error: %v", err)
 		return
 	}
 	if err := config.RenameSessionDir(oldName, newName); err != nil {
-		_ = m.cfg.RenameWorkspace(newName, oldName) // roll back in-memory mutation
+		_ = m.cfg.RenameProfile(newName, oldName) // roll back in-memory mutation
 		m.statusMsg = fmt.Sprintf("rename session dir error: %v", err)
 		return
 	}
@@ -449,42 +564,53 @@ func (m *Model) applyWsRename() {
 			m.statusMsg = fmt.Sprintf("save error and rollback failed — session dir is now %q: %v / %v", newName, err, rbErr)
 			return
 		}
-		_ = m.cfg.RenameWorkspace(newName, oldName)
+		_ = m.cfg.RenameProfile(newName, oldName)
 		m.statusMsg = fmt.Sprintf("save error: %v", err)
 		return
 	}
 	m.statusMsg = ""
-	if err := config.SyncWorkspaceSettings(m.cfg, newName); err != nil {
+	if err := config.SyncProfileSettings(m.cfg, newName); err != nil {
 		m.statusMsg = fmt.Sprintf("settings sync error: %v", err)
 	}
 }
 
-func (m *Model) applyWsOptions(name string) {
+func (m *Model) applyProfileOptions(name string) {
 	// Update worktree setting
-	for i := range m.cfg.Workspaces {
-		if m.cfg.Workspaces[i].Name == name {
-			m.cfg.Workspaces[i].Worktree = m.optionsData.Worktree == "enabled"
+	for i := range m.cfg.Profiles {
+		if m.cfg.Profiles[i].Name == name {
+			m.cfg.Profiles[i].Worktree = m.optionsData.Worktree == "enabled"
 			break
 		}
 	}
-	config.Save(m.cfg)
+	if err := config.Save(m.cfg); err != nil {
+		m.statusMsg = fmt.Sprintf("save error: %v", err)
+		return
+	}
 
 	// Update session settings (attribution)
 	if err := config.SetAttribution(name, m.optionsData.DisableAttribution == "enabled"); err != nil {
 		m.statusMsg = fmt.Sprintf("attribution error: %v", err)
+		return
 	}
+	m.statusMsg = ""
 }
 
 func (m *Model) applyProjAdd() {
 	path := expandPath(m.projAddData.FolderPath)
 	abs, err := filepath.Abs(path)
 	if err != nil {
+		m.statusMsg = fmt.Sprintf("path error: %v", err)
 		return
 	}
-	if err := m.cfg.AddProject(abs, m.projectsTarget); err != nil {
+	if err := m.cfg.AddProject(abs, m.projAddData.Profile); err != nil {
+		m.statusMsg = fmt.Sprintf("add project error: %v", err)
 		return
 	}
-	config.Save(m.cfg)
+	if err := config.Save(m.cfg); err != nil {
+		m.statusMsg = fmt.Sprintf("save error: %v", err)
+		return
+	}
+	m.statusMsg = ""
 }
 
 func (m *Model) applyProjOptions() {
@@ -503,15 +629,19 @@ func (m *Model) applyProjOptions() {
 			break
 		}
 	}
-	config.Save(m.cfg)
+	if err := config.Save(m.cfg); err != nil {
+		m.statusMsg = fmt.Sprintf("save error: %v", err)
+		return
+	}
+	m.statusMsg = ""
 }
 
 // --- Refresh helpers ---
 
-func (m *Model) refreshWorkspaceList() {
-	m.list.SetItems(workspaceItems(m.cfg))
+func (m *Model) refreshProjectList() {
+	m.list.SetItems(projectItems(m.cfg))
 }
 
-func (m *Model) refreshProjectList() {
-	m.projectList.SetItems(projectItems(m.cfg.ProjectsForWorkspace(m.projectsTarget)))
+func (m *Model) refreshProfileList() {
+	m.profileList.SetItems(profileItems(m.cfg))
 }
