@@ -240,6 +240,7 @@ func updateProjectList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "p":
 			h, v := appStyle.GetFrameSize()
 			m.profileList = buildProfileList(m.cfg, m.width-h, m.height-v-topBarHeight)
+			m.profileListReady = true
 			m.state = stateProfileList
 			return m, nil
 		case "o":
