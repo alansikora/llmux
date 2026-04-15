@@ -10,6 +10,7 @@ import (
 	"github.com/allskar/llmux/internal/claude"
 	"github.com/allskar/llmux/internal/commands"
 	"github.com/allskar/llmux/internal/config"
+	"github.com/allskar/llmux/internal/skills"
 	"github.com/allskar/llmux/internal/update"
 	"github.com/spf13/cobra"
 )
@@ -84,6 +85,7 @@ var resolveCmd = &cobra.Command{
 		config.SyncProfileSettings(cfg, result.ProfileName) //nolint:errcheck
 
 		commands.Ensure()
+		skills.Ensure()
 
 		versionLine := "\033[90m↳ llmux " + DisplayVersion()
 		if latest := update.CheckUpdateNoticeCached(DisplayVersion()); latest != "" {

@@ -112,6 +112,10 @@ Installed automatically during `llmux init` into `~/.claude/commands/llmux/`:
 
 These work inside any Claude Code session, including worktree sessions.
 
+## Skills & commands sync
+
+llmux symlinks `~/.claude/skills/` and `~/.claude/commands/` into every profile's session directory, so skills and slash commands you install globally are available in every profile without copying. The symlinks are created (and kept) automatically on every `claude` invocation.
+
 ## Shell wrapper flags
 
 The `claude()` wrapper respects these flags:
