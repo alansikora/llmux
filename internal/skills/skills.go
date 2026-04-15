@@ -1,6 +1,7 @@
 package skills
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,13 +25,16 @@ func Install() (string, error) {
 		return "", fmt.Errorf("creating skills directory: %w", err)
 	}
 
-	EnsureSessionSymlinks(skillsDir)
+	if err := ensureSessionSymlinks(skillsDir); err != nil {
+		return "", err
+	}
 
 	return skillsDir, nil
 }
 
 // Ensure creates ~/.claude/skills if missing and keeps every session directory
-// symlinked to it. Idempotent and cheap to call on every resolve.
+// symlinked to it. Idempotent and cheap to call on every resolve; errors are
+// swallowed so a transient filesystem issue can't block launching claude.
 func Ensure() {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -38,31 +42,50 @@ func Ensure() {
 	}
 	skillsDir := filepath.Join(home, ".claude", "skills")
 
-	if _, err := os.Stat(skillsDir); err != nil {
-		if err := os.MkdirAll(skillsDir, 0755); err != nil {
-			return
-		}
+	// MkdirAll is a no-op when the directory already exists, so we call it
+	// unconditionally — a bare os.Stat guard would miss the case where
+	// skillsDir is itself a symlink to a missing target.
+	if err := os.MkdirAll(skillsDir, 0755); err != nil {
+		return
 	}
 
-	EnsureSessionSymlinks(skillsDir)
+	ensureSessionSymlinks(skillsDir) //nolint:errcheck // best-effort on hot path
 }
 
-// EnsureSessionSymlinks creates a `skills` symlink in each session directory
-// that doesn't already have one. Idempotent and safe to call on every resolve.
-func EnsureSessionSymlinks(skillsDir string) {
+// ensureSessionSymlinks creates a `skills` symlink in each session directory
+// that doesn't already have a valid one. Dangling symlinks (target missing)
+// are removed and recreated so moving ~/.claude/skills doesn't leave profiles
+// permanently broken. Idempotent.
+func ensureSessionSymlinks(skillsDir string) error {
 	sessionsDir := config.SessionsDir()
 	entries, err := os.ReadDir(sessionsDir)
 	if err != nil {
-		return
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("reading sessions directory: %w", err)
 	}
+
+	var errs []error
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
 		}
 		dst := filepath.Join(sessionsDir, e.Name(), "skills")
 		if _, err := os.Lstat(dst); err == nil {
-			continue // already exists
+			// Something exists at dst. If os.Stat resolves it, leave it
+			// alone; otherwise it's a dangling symlink — replace it.
+			if _, err := os.Stat(dst); err == nil {
+				continue
+			}
+			if err := os.Remove(dst); err != nil {
+				errs = append(errs, fmt.Errorf("removing stale symlink %s: %w", dst, err))
+				continue
+			}
 		}
-		os.Symlink(skillsDir, dst)
+		if err := os.Symlink(skillsDir, dst); err != nil {
+			errs = append(errs, fmt.Errorf("creating symlink %s: %w", dst, err))
+		}
 	}
+	return errors.Join(errs...)
 }
