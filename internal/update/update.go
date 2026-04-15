@@ -279,8 +279,10 @@ func Upgrade(targetVersion string) error {
 		return err
 	}
 
-	// Clear the update check cache so the notice disappears
-	os.Remove(cachePath())
+	// Refresh the cache with the newly-installed version so the ambient
+	// notice correctly reports no update available (instead of re-checking
+	// immediately on next invocation).
+	writeCache(targetVersion)
 
 	return nil
 }
