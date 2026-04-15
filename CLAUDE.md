@@ -36,7 +36,7 @@ Version is set via ldflags: `-X main.version=v{version}`
 
 - **Profile** = auth/credentials bundle (OAuth subscription or API key). Session directories with `.claude.json` and `settings.json` are per-profile.
 - **Project** = a directory path + profile reference. Projects are the primary entity — the main TUI view is a flat alphabetical list of all projects.
-- **Profile resolution** uses longest-prefix path matching against registered project paths (with path-separator boundaries). If no project matches, falls back to the default profile.
+- **Profile resolution** uses longest-prefix path matching against registered project paths (with path-separator boundaries). If no project matches, the shell wrapper prompts via `llmux register` (default profile pre-selected). When `auto_default_profile` is enabled in config, the resolver silently falls through to the default profile instead.
 - **Config** stored as JSON in `~/.config/llmux/` (overridable via `LLMUX_CONFIG_DIR`). Legacy configs with `workspaces` are auto-migrated to `profiles` on load.
 - **Session data** lives in `~/.config/llmux/sessions/{profile}/`
 - **Shell integration** generates a `claude()` wrapper function that calls `llmux resolve` to route to the correct profile based on `pwd`.

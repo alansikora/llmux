@@ -3,10 +3,11 @@ package tui
 import "github.com/charmbracelet/huh"
 
 type generalOptionsFormData struct {
-	ShortAlias  bool
-	ApplyMarker bool
-	AutoMode    bool
-	StatusLine  bool
+	ShortAlias         bool
+	ApplyMarker        bool
+	AutoMode           bool
+	StatusLine         bool
+	AutoDefaultProfile bool
 }
 
 func newGeneralOptionsForm(data *generalOptionsFormData, orig generalOptionsFormData) *huh.Form {
@@ -44,6 +45,14 @@ func newGeneralOptionsForm(data *generalOptionsFormData, orig generalOptionsForm
 				Affirmative("Enabled").
 				Negative("Disabled").
 				Value(&data.StatusLine),
+			confirmLeft().
+				TitleFunc(func() string {
+					return dirtyTitle("Auto-use default profile?", data.AutoDefaultProfile != orig.AutoDefaultProfile)
+				}, &data.AutoDefaultProfile).
+				Description("For unregistered directories, silently use the default profile instead of prompting.").
+				Affirmative("Enabled").
+				Negative("Disabled").
+				Value(&data.AutoDefaultProfile),
 		),
 	).WithKeyMap(formKeyMap())
 }

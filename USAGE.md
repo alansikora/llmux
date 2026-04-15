@@ -64,6 +64,7 @@ Press `o` from the project list to configure global settings:
 - **Apply marker** — creates a `.llmux-applied` file when a session is applied
 - **Auto mode** — passes `--enable-auto-mode` to Claude Code
 - **Status line** — enables [ccstatusline](https://github.com/sirmalloc/ccstatusline) across all profiles
+- **Auto-use default profile** — when enabled, unregistered directories silently use the default profile. When disabled (the default), running `claude` in an unregistered directory prompts you to pick a profile (with the default pre-selected)
 
 ## Worktree session workflow
 

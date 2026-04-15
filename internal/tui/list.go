@@ -245,10 +245,11 @@ func updateProjectList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "o":
 			m.generalOptionsData = generalOptionsFormData{
-				ShortAlias:  m.cfg.ShortAlias,
-				ApplyMarker: m.cfg.ApplyMarker,
-				AutoMode:    m.cfg.AutoMode,
-				StatusLine:  m.cfg.StatusLine,
+				ShortAlias:         m.cfg.ShortAlias,
+				ApplyMarker:        m.cfg.ApplyMarker,
+				AutoMode:           m.cfg.AutoMode,
+				StatusLine:         m.cfg.StatusLine,
+				AutoDefaultProfile: m.cfg.AutoDefaultProfile,
 			}
 			m.generalOptionsForm = newGeneralOptionsForm(&m.generalOptionsData, m.generalOptionsData)
 			m.state = stateGeneralOptions
