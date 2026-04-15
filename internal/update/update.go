@@ -181,12 +181,14 @@ func CheckUpdateNoticeAsync(currentVersion string) <-chan string {
 
 // Upgrade downloads and installs the latest (or specified) version.
 func Upgrade(targetVersion string) error {
+	fetchedLatest := false
 	if targetVersion == "" {
 		latest, err := FetchLatest()
 		if err != nil {
 			return fmt.Errorf("fetching latest version: %w", err)
 		}
 		targetVersion = latest
+		fetchedLatest = true
 	}
 
 	osName := runtime.GOOS
@@ -279,10 +281,12 @@ func Upgrade(targetVersion string) error {
 		return err
 	}
 
-	// Refresh the cache with the newly-installed version so the ambient
-	// notice correctly reports no update available (instead of re-checking
-	// immediately on next invocation).
-	writeCache(targetVersion)
+	// Refresh the cache only when targetVersion came from FetchLatest — an
+	// explicit targetVersion could be a downgrade, and recording it as the
+	// latest would suppress valid update notices for up to the cache TTL.
+	if fetchedLatest {
+		writeCache(targetVersion)
+	}
 
 	return nil
 }
