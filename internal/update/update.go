@@ -182,7 +182,7 @@ func CheckUpdateNoticeAsync(currentVersion string) <-chan string {
 // Upgrade downloads and installs the latest (or specified) version.
 func Upgrade(targetVersion string) error {
 	if targetVersion == "" {
-		latest, err := fetchLatest()
+		latest, err := FetchLatest()
 		if err != nil {
 			return fmt.Errorf("fetching latest version: %w", err)
 		}
@@ -285,8 +285,11 @@ func Upgrade(targetVersion string) error {
 	return nil
 }
 
-// fetchLatest gets the latest release tag directly from GitHub (no cache).
-func fetchLatest() (string, error) {
+// FetchLatest gets the latest release tag directly from GitHub, bypassing
+// the cache. It refreshes the cache on success so ambient notices stay in
+// sync. Use this for explicit user actions like `llmux upgrade`; use
+// CheckLatest for passive checks that should respect the TTL.
+func FetchLatest() (string, error) {
 	client := &http.Client{Timeout: apiTimeout}
 	resp, err := client.Get(fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo))
 	if err != nil {
@@ -302,6 +305,7 @@ func fetchLatest() (string, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
 		return "", err
 	}
+	writeCache(release.TagName)
 	return release.TagName, nil
 }
 

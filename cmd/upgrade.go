@@ -18,7 +18,7 @@ var upgradeCmd = &cobra.Command{
 		fmt.Fprintf(os.Stderr, "Current version: %s\n", current)
 		fmt.Fprintf(os.Stderr, "Checking for updates...\n")
 
-		latest, err := update.CheckLatest()
+		latest, err := update.FetchLatest()
 		if err != nil {
 			return fmt.Errorf("checking for updates: %w", err)
 		}
