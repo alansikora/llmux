@@ -34,13 +34,14 @@ func (p *Project) ResolvedWorktree(pf Profile) bool {
 }
 
 type Config struct {
-	Profiles       []Profile `json:"profiles"`
-	Projects       []Project `json:"projects,omitempty"`
-	DefaultProfile string    `json:"default_profile,omitempty"`
-	ShortAlias     bool      `json:"short_alias,omitempty"`
-	ApplyMarker    bool      `json:"apply_marker,omitempty"`
-	AutoMode       bool      `json:"auto_mode,omitempty"`
-	StatusLine     bool      `json:"status_line,omitempty"`
+	Profiles           []Profile `json:"profiles"`
+	Projects           []Project `json:"projects,omitempty"`
+	DefaultProfile     string    `json:"default_profile,omitempty"`
+	ShortAlias         bool      `json:"short_alias,omitempty"`
+	ApplyMarker        bool      `json:"apply_marker,omitempty"`
+	AutoMode           bool      `json:"auto_mode,omitempty"`
+	StatusLine         bool      `json:"status_line,omitempty"`
+	AutoDefaultProfile bool      `json:"auto_default_profile,omitempty"`
 }
 
 type ResolveResult struct {
@@ -224,7 +225,9 @@ func (c *Config) FindProject(dir string) (*Project, error) {
 }
 
 // FindProfileForDir finds the profile for a given directory by looking up
-// the project first, then its profile. Falls back to default profile.
+// the project first, then its profile. When AutoDefaultProfile is enabled,
+// falls back to the default profile silently; otherwise returns ErrUnmapped
+// so the shell wrapper can prompt the user to register the directory.
 func (c *Config) FindProfileForDir(dir string) (*Profile, *Project, error) {
 	proj, err := c.FindProject(dir)
 	if err == nil {
@@ -235,12 +238,18 @@ func (c *Config) FindProfileForDir(dir string) (*Profile, *Project, error) {
 		return pf, proj, nil
 	}
 
-	// Fall back to default profile
-	if c.DefaultProfile != "" {
-		pf, pfErr := c.FindProfile(c.DefaultProfile)
-		if pfErr == nil {
-			return pf, nil, nil
+	// Silent fallback to default is opt-in. Otherwise, surface ErrUnmapped
+	// so the shell wrapper triggers `llmux register` (which pre-selects the
+	// default profile for one-keystroke confirmation).
+	if c.AutoDefaultProfile {
+		if c.DefaultProfile == "" {
+			return nil, nil, fmt.Errorf("auto_default_profile is enabled but no default profile is set")
 		}
+		pf, pfErr := c.FindProfile(c.DefaultProfile)
+		if pfErr != nil {
+			return nil, nil, fmt.Errorf("auto_default_profile points at %q which does not exist", c.DefaultProfile)
+		}
+		return pf, nil, nil
 	}
 
 	return nil, nil, ErrUnmapped

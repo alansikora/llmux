@@ -47,12 +47,14 @@ var registerCmd = &cobra.Command{
 			selected = cfg.DefaultProfile
 		}
 
-		err = huh.NewSelect[string]().
+		sel := huh.NewSelect[string]().
 			Title(fmt.Sprintf("Select profile for %s", dir)).
 			Options(options...).
-			Value(&selected).
-			Run()
-		if err != nil {
+			Value(&selected)
+		if cfg.DefaultProfile != "" {
+			sel = sel.Description("Tip: enable \"Auto-use default profile\" in llmux General Options to skip this prompt for unregistered directories.")
+		}
+		if err := sel.Run(); err != nil {
 			return err
 		}
 

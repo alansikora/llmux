@@ -70,8 +70,8 @@ Claude Code stores everything in `~/.claude`. If you work across multiple projec
 - **Isolated sessions** — each profile gets its own auth, history, settings, and API key
 - **Profile-scoped insights** — `/insights` uses your conversation history, and since each profile has its own, you get account-specific insights automatically
 - **Automatic routing** — a thin shell wrapper resolves the right profile based on your current directory. Register a parent directory and all subdirectories inherit it; register a more specific child path and it gets its own mapping while siblings keep the parent's
-- **Auto-registration** — run `claude` in an unregistered directory and get prompted to pick a profile
-- **Default profile** — set a fallback for directories that don't match any project
+- **Auto-registration** — run `claude` in an unregistered directory and get prompted to pick a profile (default pre-selected for one-keystroke confirmation)
+- **Default profile** — set a fallback that's pre-selected in the auto-registration prompt, or enable _Auto-use default profile_ in General Options to skip the prompt entirely and always fall through to the default
 - **Subcommand passthrough** — `claude mcp`, `claude config`, etc. bypass profile resolution and work natively
 
 ### Worktree sessions

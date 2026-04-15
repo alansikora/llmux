@@ -307,15 +307,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			prevApply := m.cfg.ApplyMarker
 			prevAuto := m.cfg.AutoMode
 			prevStatus := m.cfg.StatusLine
+			prevAutoDefault := m.cfg.AutoDefaultProfile
 			m.cfg.ShortAlias = m.generalOptionsData.ShortAlias
 			m.cfg.ApplyMarker = m.generalOptionsData.ApplyMarker
 			m.cfg.AutoMode = m.generalOptionsData.AutoMode
 			m.cfg.StatusLine = m.generalOptionsData.StatusLine
+			m.cfg.AutoDefaultProfile = m.generalOptionsData.AutoDefaultProfile
 			if err := config.Save(m.cfg); err != nil {
 				m.cfg.ShortAlias = prevAlias
 				m.cfg.ApplyMarker = prevApply
 				m.cfg.AutoMode = prevAuto
 				m.cfg.StatusLine = prevStatus
+				m.cfg.AutoDefaultProfile = prevAutoDefault
 				m.statusMsg = fmt.Sprintf("save error: %v", err)
 				m.state = stateProjectList
 				m.refreshProjectList()
