@@ -61,7 +61,10 @@ var resolveCmd = &cobra.Command{
 			if errors.Is(err, config.ErrUnmapped) {
 				os.Exit(2)
 			}
-			return err
+			// Print to stderr so the user sees the reason — SilenceErrors
+			// suppresses cobra's default error output.
+			fmt.Fprintf(os.Stderr, "llmux: %v\n", err)
+			os.Exit(1)
 		}
 
 		// Start the update check after early-exit checks so we don't leak a

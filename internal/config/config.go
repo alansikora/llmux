@@ -241,11 +241,15 @@ func (c *Config) FindProfileForDir(dir string) (*Profile, *Project, error) {
 	// Silent fallback to default is opt-in. Otherwise, surface ErrUnmapped
 	// so the shell wrapper triggers `llmux register` (which pre-selects the
 	// default profile for one-keystroke confirmation).
-	if c.AutoDefaultProfile && c.DefaultProfile != "" {
-		pf, pfErr := c.FindProfile(c.DefaultProfile)
-		if pfErr == nil {
-			return pf, nil, nil
+	if c.AutoDefaultProfile {
+		if c.DefaultProfile == "" {
+			return nil, nil, fmt.Errorf("auto_default_profile is enabled but no default profile is set")
 		}
+		pf, pfErr := c.FindProfile(c.DefaultProfile)
+		if pfErr != nil {
+			return nil, nil, fmt.Errorf("auto_default_profile points at %q which does not exist", c.DefaultProfile)
+		}
+		return pf, nil, nil
 	}
 
 	return nil, nil, ErrUnmapped
