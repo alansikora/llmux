@@ -62,7 +62,12 @@ var resolveCmd = &cobra.Command{
 				os.Exit(2)
 			}
 			// Print to stderr so the user sees the reason — SilenceErrors
-			// suppresses cobra's default error output.
+			// suppresses cobra's default error output. os.Exit is intentional
+			// here: this error path runs before any defers in RunE are
+			// registered (the updateCh defer is set up after this block), so
+			// there is nothing to skip. If new defers are ever added above
+			// this point, convert this to `return err` + a top-level exit
+			// handler so deferred cleanup runs.
 			fmt.Fprintf(os.Stderr, "llmux: %v\n", err)
 			os.Exit(1)
 		}
