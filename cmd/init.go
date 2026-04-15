@@ -7,6 +7,7 @@ import (
 	"github.com/allskar/llmux/internal/commands"
 	"github.com/allskar/llmux/internal/config"
 	"github.com/allskar/llmux/internal/shell"
+	"github.com/allskar/llmux/internal/skills"
 	"github.com/spf13/cobra"
 )
 
@@ -51,6 +52,12 @@ var initCmd = &cobra.Command{
 			return err
 		}
 		fmt.Printf("Installed Claude Code slash commands to %s\n", cmdDir)
+
+		skillsDir, err := skills.Install()
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Linked Claude Code skills from %s\n", skillsDir)
 		return nil
 	},
 }

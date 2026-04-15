@@ -9,6 +9,7 @@ import (
 
 	"github.com/allskar/llmux/internal/commands"
 	"github.com/allskar/llmux/internal/config"
+	"github.com/allskar/llmux/internal/skills"
 	"github.com/allskar/llmux/internal/worktree"
 	"github.com/spf13/cobra"
 )
@@ -65,6 +66,7 @@ var resumeCmd = &cobra.Command{
 		os.MkdirAll(result.SessionDir, 0755) //nolint:errcheck
 		config.SyncProfileSettings(cfg, result.ProfileName) //nolint:errcheck
 		commands.Ensure()
+		skills.Ensure()
 
 		env := os.Environ()
 		env = setEnv(env, "CLAUDE_CONFIG_DIR", result.SessionDir)
