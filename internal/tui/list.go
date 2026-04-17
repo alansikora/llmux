@@ -60,13 +60,13 @@ type projectItem struct {
 func (p projectItem) Title() string {
 	prefix := unauthStyle.Render("[no auth]")
 	if p.authInfo.Authenticated {
-		prefix = authStyle.Render("[" + p.authInfo.Email + "]")
+		prefix = authStyle.Render("[" + p.profile + "]")
 	}
 	return fmt.Sprintf("%s %s", prefix, p.name)
 }
 
 func (p projectItem) Description() string {
-	desc := fmt.Sprintf("%s · %s", p.path, p.profile)
+	desc := p.path
 	if p.overrides.Worktree != nil {
 		if *p.overrides.Worktree {
 			desc += " [worktree: on]"
