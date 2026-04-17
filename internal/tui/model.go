@@ -625,14 +625,37 @@ func (m *Model) applyProjAdd() {
 }
 
 func (m *Model) applyProjOptions() {
+	// Snapshot the pre-mutation state so we can roll back if Save fails and
+	// keep m.cfg in sync with disk.
+	var origProfile string
+	var origWorktree *bool
+	found := false
 	for i := range m.cfg.Projects {
 		if m.cfg.Projects[i].Path == m.projOptionsTarget {
-			if m.optionsData.Profile != "" && m.optionsData.Profile != m.cfg.Projects[i].Profile {
-				if err := m.cfg.SetProjectProfile(m.projOptionsTarget, m.optionsData.Profile); err != nil {
-					m.statusMsg = fmt.Sprintf("profile change error: %v", err)
-					return
-				}
-			}
+			origProfile = m.cfg.Projects[i].Profile
+			origWorktree = m.cfg.Projects[i].Overrides.Worktree
+			found = true
+			break
+		}
+	}
+	if !found {
+		m.statusMsg = fmt.Sprintf("project %q not found", m.projOptionsTarget)
+		return
+	}
+
+	profileChanged := false
+	if m.optionsData.Profile != "" && m.optionsData.Profile != origProfile {
+		if err := m.cfg.SetProjectProfile(m.projOptionsTarget, m.optionsData.Profile); err != nil {
+			m.statusMsg = fmt.Sprintf("profile change error: %v", err)
+			return
+		}
+		profileChanged = true
+	}
+
+	// Re-lookup the project index after the possible profile mutation in case
+	// the underlying slice is ever reordered.
+	for i := range m.cfg.Projects {
+		if m.cfg.Projects[i].Path == m.projOptionsTarget {
 			switch m.optionsData.Worktree {
 			case "inherit":
 				m.cfg.Projects[i].Overrides.Worktree = nil
@@ -646,7 +669,18 @@ func (m *Model) applyProjOptions() {
 			break
 		}
 	}
+
 	if err := config.Save(m.cfg); err != nil {
+		// Roll back in-memory mutations so the UI and disk stay in sync.
+		for i := range m.cfg.Projects {
+			if m.cfg.Projects[i].Path == m.projOptionsTarget {
+				if profileChanged {
+					m.cfg.Projects[i].Profile = origProfile
+				}
+				m.cfg.Projects[i].Overrides.Worktree = origWorktree
+				break
+			}
+		}
 		m.statusMsg = fmt.Sprintf("save error: %v", err)
 		return
 	}
