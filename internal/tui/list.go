@@ -61,6 +61,8 @@ func (p projectItem) Title() string {
 	prefix := unauthStyle.Render("[no auth]")
 	if p.authInfo.Authenticated {
 		prefix = authStyle.Render("[" + p.profile + "]")
+	} else if p.profile != "" {
+		prefix = unauthStyle.Render("[" + p.profile + "]")
 	}
 	return fmt.Sprintf("%s %s", prefix, p.name)
 }
