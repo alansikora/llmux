@@ -672,11 +672,13 @@ func (m *Model) applyProjOptions() {
 
 	if err := config.Save(m.cfg); err != nil {
 		// Roll back in-memory mutations so the UI and disk stay in sync.
+		// Route profile rollback through SetProjectProfile so we don't depend
+		// on its current "only mutates .Profile" implementation detail.
+		if profileChanged {
+			_ = m.cfg.SetProjectProfile(m.projOptionsTarget, origProfile)
+		}
 		for i := range m.cfg.Projects {
 			if m.cfg.Projects[i].Path == m.projOptionsTarget {
-				if profileChanged {
-					m.cfg.Projects[i].Profile = origProfile
-				}
 				m.cfg.Projects[i].Overrides.Worktree = origWorktree
 				break
 			}
