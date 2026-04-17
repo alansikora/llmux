@@ -215,11 +215,14 @@ func updateProjectList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 				m.projOptionsTarget = item.path
+				// Project-level form doesn't expose DisableAttribution — it's
+				// stored per-profile in session settings and has no
+				// per-project override.
 				m.optionsData = optionsFormData{
-					Worktree:           worktreeVal,
-					DisableAttribution: "inherit",
+					Profile:  item.profile,
+					Worktree: worktreeVal,
 				}
-				m.optionsForm = newOptionsForm(&m.optionsData, m.optionsData, true, defaults)
+				m.optionsForm = newOptionsForm(&m.optionsData, m.optionsData, true, defaults, m.cfg.Profiles)
 				m.state = stateProjectOptions
 				return m, m.optionsForm.Init()
 			}
@@ -308,7 +311,7 @@ func updateProfileList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 					DisableAttribution: attrVal,
 					Worktree:           worktreeVal,
 				}
-				m.optionsForm = newOptionsForm(&m.optionsData, m.optionsData, false, nil)
+				m.optionsForm = newOptionsForm(&m.optionsData, m.optionsData, false, nil, nil)
 				m.state = stateProfileOptions
 				return m, m.optionsForm.Init()
 			}

@@ -625,6 +625,35 @@ func (m *Model) applyProjAdd() {
 }
 
 func (m *Model) applyProjOptions() {
+	// Snapshot the pre-mutation state so we can roll back if Save fails and
+	// keep m.cfg in sync with disk.
+	var origProfile string
+	var origWorktree *bool
+	found := false
+	for i := range m.cfg.Projects {
+		if m.cfg.Projects[i].Path == m.projOptionsTarget {
+			origProfile = m.cfg.Projects[i].Profile
+			origWorktree = m.cfg.Projects[i].Overrides.Worktree
+			found = true
+			break
+		}
+	}
+	if !found {
+		m.statusMsg = fmt.Sprintf("project %q not found", m.projOptionsTarget)
+		return
+	}
+
+	profileChanged := false
+	if m.optionsData.Profile != "" && m.optionsData.Profile != origProfile {
+		if err := m.cfg.SetProjectProfile(m.projOptionsTarget, m.optionsData.Profile); err != nil {
+			m.statusMsg = fmt.Sprintf("profile change error: %v", err)
+			return
+		}
+		profileChanged = true
+	}
+
+	// Re-lookup the project index after the possible profile mutation in case
+	// the underlying slice is ever reordered.
 	for i := range m.cfg.Projects {
 		if m.cfg.Projects[i].Path == m.projOptionsTarget {
 			switch m.optionsData.Worktree {
@@ -640,7 +669,20 @@ func (m *Model) applyProjOptions() {
 			break
 		}
 	}
+
 	if err := config.Save(m.cfg); err != nil {
+		// Roll back in-memory mutations so the UI and disk stay in sync.
+		// Route profile rollback through SetProjectProfile so we don't depend
+		// on its current "only mutates .Profile" implementation detail.
+		if profileChanged {
+			_ = m.cfg.SetProjectProfile(m.projOptionsTarget, origProfile)
+		}
+		for i := range m.cfg.Projects {
+			if m.cfg.Projects[i].Path == m.projOptionsTarget {
+				m.cfg.Projects[i].Overrides.Worktree = origWorktree
+				break
+			}
+		}
 		m.statusMsg = fmt.Sprintf("save error: %v", err)
 		return
 	}
