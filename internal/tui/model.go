@@ -627,6 +627,12 @@ func (m *Model) applyProjAdd() {
 func (m *Model) applyProjOptions() {
 	for i := range m.cfg.Projects {
 		if m.cfg.Projects[i].Path == m.projOptionsTarget {
+			if m.optionsData.Profile != "" && m.optionsData.Profile != m.cfg.Projects[i].Profile {
+				if err := m.cfg.SetProjectProfile(m.projOptionsTarget, m.optionsData.Profile); err != nil {
+					m.statusMsg = fmt.Sprintf("profile change error: %v", err)
+					return
+				}
+			}
 			switch m.optionsData.Worktree {
 			case "inherit":
 				m.cfg.Projects[i].Overrides.Worktree = nil

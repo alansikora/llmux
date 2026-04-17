@@ -216,10 +216,11 @@ func updateProjectList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.projOptionsTarget = item.path
 				m.optionsData = optionsFormData{
+					Profile:            item.profile,
 					Worktree:           worktreeVal,
 					DisableAttribution: "inherit",
 				}
-				m.optionsForm = newOptionsForm(&m.optionsData, m.optionsData, true, defaults)
+				m.optionsForm = newOptionsForm(&m.optionsData, m.optionsData, true, defaults, m.cfg.Profiles)
 				m.state = stateProjectOptions
 				return m, m.optionsForm.Init()
 			}
@@ -308,7 +309,7 @@ func updateProfileList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 					DisableAttribution: attrVal,
 					Worktree:           worktreeVal,
 				}
-				m.optionsForm = newOptionsForm(&m.optionsData, m.optionsData, false, nil)
+				m.optionsForm = newOptionsForm(&m.optionsData, m.optionsData, false, nil, nil)
 				m.state = stateProfileOptions
 				return m, m.optionsForm.Init()
 			}

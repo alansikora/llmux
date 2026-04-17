@@ -1,6 +1,9 @@
 package tui
 
 import (
+	"fmt"
+
+	"github.com/allskar/llmux/internal/config"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -37,6 +40,7 @@ func formKeyMap() *huh.KeyMap {
 // Unified options form data for both profile and project levels.
 // Profile uses "enabled"/"disabled"; project adds "inherit".
 type optionsFormData struct {
+	Profile            string // project-level only: auth/credential profile name
 	Worktree           string // "inherit", "enabled", "disabled"
 	DisableAttribution string // "inherit", "enabled", "disabled"
 }
@@ -67,29 +71,53 @@ func selectOptions(label string, allowInherit bool, profileDefault *bool) []huh.
 	return opts
 }
 
-func newOptionsForm(data *optionsFormData, orig optionsFormData, allowInherit bool, defaults *profileDefaults) *huh.Form {
+// newOptionsForm builds the unified options form. When profiles is non-empty,
+// a profile picker is prepended (project-level edits); otherwise it is omitted
+// (profile-level edits).
+func newOptionsForm(data *optionsFormData, orig optionsFormData, allowInherit bool, defaults *profileDefaults, profiles []config.Profile) *huh.Form {
 	var worktreeDefault, attrDefault *bool
 	if defaults != nil {
 		worktreeDefault = &defaults.Worktree
 		attrDefault = &defaults.DisableAttribution
 	}
 
-	return huh.NewForm(
-		huh.NewGroup(
+	var fields []huh.Field
+	if len(profiles) > 0 {
+		profileOptions := make([]huh.Option[string], len(profiles))
+		for i, pf := range profiles {
+			label := pf.Name
+			authInfo := config.GetAuthInfo(pf.Name)
+			if authInfo.Authenticated {
+				label = fmt.Sprintf("%s (%s)", pf.Name, authInfo.Email)
+			}
+			profileOptions[i] = huh.NewOption(label, pf.Name)
+		}
+		fields = append(fields,
 			huh.NewSelect[string]().
 				TitleFunc(func() string {
-					return dirtyTitle("Disable commit/PR attributions?", data.DisableAttribution != orig.DisableAttribution)
-				}, &data.DisableAttribution).
-				Description("Removes \"Made with Claude Code\" from commits and PRs").
-				Options(selectOptions("Inherit from profile", allowInherit, attrDefault)...).
-				Value(&data.DisableAttribution),
-			huh.NewSelect[string]().
-				TitleFunc(func() string {
-					return dirtyTitle("Always use worktree?", data.Worktree != orig.Worktree)
-				}, &data.Worktree).
-				Description("Runs claude --worktree by default (bypass with --no-worktree)").
-				Options(selectOptions("Inherit from profile", allowInherit, worktreeDefault)...).
-				Value(&data.Worktree),
-		),
-	).WithKeyMap(formKeyMap())
+					return dirtyTitle("Profile", data.Profile != orig.Profile)
+				}, &data.Profile).
+				Description("Auth/credential profile for this project").
+				Options(profileOptions...).
+				Value(&data.Profile),
+		)
+	}
+	fields = append(fields,
+		huh.NewSelect[string]().
+			TitleFunc(func() string {
+				return dirtyTitle("Disable commit/PR attributions?", data.DisableAttribution != orig.DisableAttribution)
+			}, &data.DisableAttribution).
+			Description("Removes \"Made with Claude Code\" from commits and PRs").
+			Options(selectOptions("Inherit from profile", allowInherit, attrDefault)...).
+			Value(&data.DisableAttribution),
+		huh.NewSelect[string]().
+			TitleFunc(func() string {
+				return dirtyTitle("Always use worktree?", data.Worktree != orig.Worktree)
+			}, &data.Worktree).
+			Description("Runs claude --worktree by default (bypass with --no-worktree)").
+			Options(selectOptions("Inherit from profile", allowInherit, worktreeDefault)...).
+			Value(&data.Worktree),
+	)
+
+	return huh.NewForm(huh.NewGroup(fields...)).WithKeyMap(formKeyMap())
 }
