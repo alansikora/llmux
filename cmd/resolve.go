@@ -56,7 +56,13 @@ var resolveCmd = &cobra.Command{
 			return err
 		}
 
-		result, err := cfg.Resolve(args[0])
+		var result config.ResolveResult
+		forcedProfile := os.Getenv("LLMUX_PROFILE")
+		if forcedProfile != "" {
+			result, err = cfg.ResolveProfile(forcedProfile)
+		} else {
+			result, err = cfg.Resolve(args[0])
+		}
 		if err != nil {
 			if errors.Is(err, config.ErrUnmapped) {
 				os.Exit(2)
@@ -101,7 +107,9 @@ var resolveCmd = &cobra.Command{
 		}
 		versionLine += "\033[0m\n"
 		fmt.Fprint(os.Stderr, versionLine)
-		if result.ProjectPath != "" {
+		if forcedProfile != "" {
+			fmt.Fprintf(os.Stderr, "\033[90m↳ profile: %s (LLMUX_PROFILE)\033[0m\n", result.ProfileName)
+		} else if result.ProjectPath != "" {
 			projectName := filepath.Base(result.ProjectPath)
 			fmt.Fprintf(os.Stderr, "\033[90m↳ profile: %s · project: %s\033[0m\n", result.ProfileName, projectName)
 		} else {
