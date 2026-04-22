@@ -275,6 +275,22 @@ func (c *Config) Resolve(dir string) (ResolveResult, error) {
 	return result, nil
 }
 
+// ResolveProfile returns a ResolveResult for the named profile, bypassing
+// directory-based project lookup. Used when the user explicitly pins a profile
+// (e.g. via LLMUX_PROFILE) for a single invocation. Worktree mode falls back to
+// the profile default since no project context applies.
+func (c *Config) ResolveProfile(name string) (ResolveResult, error) {
+	pf, err := c.FindProfile(name)
+	if err != nil {
+		return ResolveResult{}, err
+	}
+	return ResolveResult{
+		SessionDir:  SessionDir(pf.Name),
+		Worktree:    pf.Worktree,
+		ProfileName: pf.Name,
+	}, nil
+}
+
 func (c *Config) SetDefaultProfile(name string) error {
 	if name == "" {
 		c.DefaultProfile = ""
