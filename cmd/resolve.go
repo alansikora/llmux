@@ -121,7 +121,10 @@ var resolveCmd = &cobra.Command{
 		// Line 2: extra CLI flags (worktree or empty)
 		claudeArgs := args[1:] // everything after the path (passed via --)
 		subcmd := claude.IsSubcommand(claudeArgs)
-		worktreeOverride := hasWorktreeOverride(claudeArgs)
+		// LLMUX_PROFILE is an ad-hoc override with no project context, so
+		// don't inject --worktree based on the profile default — the user
+		// hasn't opted into worktree semantics for this invocation.
+		worktreeOverride := hasWorktreeOverride(claudeArgs) || forcedProfile != ""
 		if !subcmd && !worktreeOverride && result.Worktree && isGitRepo(args[0]) {
 			fmt.Fprint(os.Stderr, "\033[90m↳ worktree mode enabled. Use --no-worktree to open claude normally.\033[0m\n")
 			fmt.Print("--worktree")
