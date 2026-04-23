@@ -39,10 +39,14 @@ func (p profileItem) Title() string {
 }
 
 func (p profileItem) Description() string {
+	count := fmt.Sprintf("%d projects", p.projectCount)
 	if p.projectCount == 1 {
-		return "1 project"
+		count = "1 project"
 	}
-	return fmt.Sprintf("%d projects", p.projectCount)
+	if org := p.authInfo.Organization; org != "" {
+		return fmt.Sprintf("%s · %s", count, org)
+	}
+	return count
 }
 
 func (p profileItem) FilterValue() string { return p.name }
