@@ -209,7 +209,7 @@ func updateProjectList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 				defaults := &profileDefaults{}
 				if pf != nil {
 					defaults.Worktree = pf.Worktree
-					defaults.DisableAttribution = config.IsAttributionDisabled(pf.Name)
+					defaults.DisableAttribution = pf.DisableAttribution
 				}
 
 				worktreeVal := "inherit"
@@ -300,14 +300,14 @@ func updateProfileList(m *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "e", "enter":
 			if item, ok := m.profileList.SelectedItem().(profileItem); ok {
 				attrVal := "disabled"
-				if config.IsAttributionDisabled(item.name) {
-					attrVal = "enabled"
-				}
 				worktreeVal := "disabled"
 				for _, pf := range m.cfg.Profiles {
 					if pf.Name == item.name {
 						if pf.Worktree {
 							worktreeVal = "enabled"
+						}
+						if pf.DisableAttribution {
+							attrVal = "enabled"
 						}
 						break
 					}

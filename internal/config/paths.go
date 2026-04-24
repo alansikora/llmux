@@ -114,6 +114,14 @@ func Load() (*Config, error) {
 		}
 	}
 
+	// Promote any legacy on-disk "attribution" session-settings key into
+	// Profile.DisableAttribution so SyncProfileSettings can enforce it.
+	if migrateLegacyAttribution(&cfg) {
+		if err := Save(&cfg); err != nil {
+			fmt.Fprintf(os.Stderr, "llmux: warning: failed to save migrated attribution config (will retry on next launch): %v\n", err)
+		}
+	}
+
 	return &cfg, nil
 }
 
@@ -212,6 +220,11 @@ func newStatusLineConfig() map[string]any {
 // settings.json. It is idempotent and preserves unmanaged keys.
 // The write is skipped if the resulting JSON is identical to what is on disk.
 func SyncProfileSettings(cfg *Config, profileName string) error {
+	pf, err := cfg.FindProfile(profileName)
+	if err != nil {
+		return err
+	}
+
 	existing, _ := os.ReadFile(filepath.Join(SessionDir(profileName), "settings.json"))
 
 	var settings map[string]any
@@ -254,6 +267,16 @@ func SyncProfileSettings(cfg *Config, profileName string) error {
 		}
 	}
 
+	// attribution (commit/PR "Generated with Claude Code" footers)
+	if pf.DisableAttribution {
+		settings["attribution"] = map[string]string{
+			"commit": "",
+			"pr":     "",
+		}
+	} else {
+		delete(settings, "attribution")
+	}
+
 	// Skip write if nothing changed to avoid unnecessary I/O and write races.
 	// Normalize existing bytes through marshal to make comparison format-independent.
 	updated, err := json.MarshalIndent(settings, "", "  ")
@@ -281,32 +304,26 @@ func SyncAllProfileSettings(cfg *Config) error {
 	return errors.Join(errs...)
 }
 
-// IsAttributionDisabled reports whether the attribution-suppression key
-// is present in a profile's session settings.
-func IsAttributionDisabled(name string) bool {
-	settings := ReadSessionSettings(name)
-	if settings == nil {
-		return false
-	}
-	_, ok := settings["attribution"]
-	return ok
-}
-
-// SetAttribution enables or disables the attribution setting for a profile.
-func SetAttribution(name string, disabled bool) error {
-	settings := ReadSessionSettings(name)
-	if settings == nil {
-		settings = map[string]any{}
-	}
-	if disabled {
-		settings["attribution"] = map[string]string{
-			"commit": "",
-			"pr":     "",
+// migrateLegacyAttribution promotes the legacy per-profile "attribution"
+// key in session settings.json into Profile.DisableAttribution on the
+// Config. Returns true if any profile was migrated. Idempotent: once the
+// field is set on Profile, SyncProfileSettings becomes the source of truth.
+func migrateLegacyAttribution(cfg *Config) bool {
+	migrated := false
+	for i := range cfg.Profiles {
+		if cfg.Profiles[i].DisableAttribution {
+			continue
 		}
-	} else {
-		delete(settings, "attribution")
+		settings := ReadSessionSettings(cfg.Profiles[i].Name)
+		if settings == nil {
+			continue
+		}
+		if _, ok := settings["attribution"]; ok {
+			cfg.Profiles[i].DisableAttribution = true
+			migrated = true
+		}
 	}
-	return WriteSessionSettings(name, settings)
+	return migrated
 }
 
 // AuthInfo holds display information about a profile's authentication.

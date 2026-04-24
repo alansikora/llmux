@@ -586,21 +586,29 @@ func (m *Model) applyProfileRename() {
 }
 
 func (m *Model) applyProfileOptions(name string) {
-	// Update worktree setting
+	idx := -1
 	for i := range m.cfg.Profiles {
 		if m.cfg.Profiles[i].Name == name {
-			m.cfg.Profiles[i].Worktree = m.optionsData.Worktree == "enabled"
+			idx = i
 			break
 		}
 	}
+	if idx < 0 {
+		m.statusMsg = fmt.Sprintf("profile %q not found", name)
+		return
+	}
+	prev := m.cfg.Profiles[idx]
+	m.cfg.Profiles[idx].Worktree = m.optionsData.Worktree == "enabled"
+	m.cfg.Profiles[idx].DisableAttribution = m.optionsData.DisableAttribution == "enabled"
+
 	if err := config.Save(m.cfg); err != nil {
+		m.cfg.Profiles[idx] = prev
 		m.statusMsg = fmt.Sprintf("save error: %v", err)
 		return
 	}
 
-	// Update session settings (attribution)
-	if err := config.SetAttribution(name, m.optionsData.DisableAttribution == "enabled"); err != nil {
-		m.statusMsg = fmt.Sprintf("attribution error: %v", err)
+	if err := config.SyncProfileSettings(m.cfg, name); err != nil {
+		m.statusMsg = fmt.Sprintf("settings sync error: %v", err)
 		return
 	}
 	m.statusMsg = ""
