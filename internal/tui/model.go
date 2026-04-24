@@ -586,10 +586,10 @@ func (m *Model) applyProfileRename() {
 }
 
 func (m *Model) applyProfileOptions(name string) {
-	// Update worktree setting
 	for i := range m.cfg.Profiles {
 		if m.cfg.Profiles[i].Name == name {
 			m.cfg.Profiles[i].Worktree = m.optionsData.Worktree == "enabled"
+			m.cfg.Profiles[i].DisableAttribution = m.optionsData.DisableAttribution == "enabled"
 			break
 		}
 	}
@@ -598,9 +598,8 @@ func (m *Model) applyProfileOptions(name string) {
 		return
 	}
 
-	// Update session settings (attribution)
-	if err := config.SetAttribution(name, m.optionsData.DisableAttribution == "enabled"); err != nil {
-		m.statusMsg = fmt.Sprintf("attribution error: %v", err)
+	if err := config.SyncProfileSettings(m.cfg, name); err != nil {
+		m.statusMsg = fmt.Sprintf("settings sync error: %v", err)
 		return
 	}
 	m.statusMsg = ""

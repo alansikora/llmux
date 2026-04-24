@@ -10,8 +10,9 @@ import (
 var ErrUnmapped = errors.New("no project configured for this directory")
 
 type Profile struct {
-	Name     string `json:"name"`
-	Worktree bool   `json:"worktree,omitempty"`
+	Name               string `json:"name"`
+	Worktree           bool   `json:"worktree,omitempty"`
+	DisableAttribution bool   `json:"disable_attribution,omitempty"`
 }
 
 type ProjectOverrides struct {
