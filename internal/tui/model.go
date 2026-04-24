@@ -586,14 +586,23 @@ func (m *Model) applyProfileRename() {
 }
 
 func (m *Model) applyProfileOptions(name string) {
+	idx := -1
 	for i := range m.cfg.Profiles {
 		if m.cfg.Profiles[i].Name == name {
-			m.cfg.Profiles[i].Worktree = m.optionsData.Worktree == "enabled"
-			m.cfg.Profiles[i].DisableAttribution = m.optionsData.DisableAttribution == "enabled"
+			idx = i
 			break
 		}
 	}
+	if idx < 0 {
+		m.statusMsg = fmt.Sprintf("profile %q not found", name)
+		return
+	}
+	prev := m.cfg.Profiles[idx]
+	m.cfg.Profiles[idx].Worktree = m.optionsData.Worktree == "enabled"
+	m.cfg.Profiles[idx].DisableAttribution = m.optionsData.DisableAttribution == "enabled"
+
 	if err := config.Save(m.cfg); err != nil {
+		m.cfg.Profiles[idx] = prev
 		m.statusMsg = fmt.Sprintf("save error: %v", err)
 		return
 	}

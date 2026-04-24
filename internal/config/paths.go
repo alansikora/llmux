@@ -220,6 +220,11 @@ func newStatusLineConfig() map[string]any {
 // settings.json. It is idempotent and preserves unmanaged keys.
 // The write is skipped if the resulting JSON is identical to what is on disk.
 func SyncProfileSettings(cfg *Config, profileName string) error {
+	pf, err := cfg.FindProfile(profileName)
+	if err != nil {
+		return err
+	}
+
 	existing, _ := os.ReadFile(filepath.Join(SessionDir(profileName), "settings.json"))
 
 	var settings map[string]any
@@ -263,8 +268,7 @@ func SyncProfileSettings(cfg *Config, profileName string) error {
 	}
 
 	// attribution (commit/PR "Generated with Claude Code" footers)
-	pf, _ := cfg.FindProfile(profileName)
-	if pf != nil && pf.DisableAttribution {
+	if pf.DisableAttribution {
 		settings["attribution"] = map[string]string{
 			"commit": "",
 			"pr":     "",
