@@ -66,8 +66,10 @@ var resumeCmd = &cobra.Command{
 					// Re-resolve the profile against the matched project's path,
 					// so the launched claude uses that project's credentials/settings
 					// rather than the CWD's.
-					if r, err := cfg.Resolve(proj.Path); err == nil {
+					if r, resolveErr := cfg.Resolve(proj.Path); resolveErr == nil {
 						result = r
+					} else {
+						fmt.Fprintf(os.Stderr, "warning: could not resolve profile for matched project %s: %v; using CWD profile\n", proj.Path, resolveErr)
 					}
 					break
 				}
