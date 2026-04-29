@@ -47,11 +47,23 @@ var resumeCmd = &cobra.Command{
 			return fmt.Errorf("listing sessions: %w", err)
 		}
 
-		var match *worktree.Session
-		for i := range sessions {
-			if sessions[i].Name == query || sessions[i].Branch == query {
-				match = &sessions[i]
-				break
+		match := findMatch(sessions, query)
+		if match == nil {
+			seen := map[string]bool{sessionsPath: true}
+			for _, proj := range cfg.Projects {
+				projRoot := worktree.ResolveSessionsPath(proj.Path)
+				if seen[projRoot] {
+					continue
+				}
+				seen[projRoot] = true
+				projSessions, err := worktree.ListSessions(projRoot)
+				if err != nil {
+					continue
+				}
+				if m := findMatch(projSessions, query); m != nil {
+					match = m
+					break
+				}
 			}
 		}
 		if match == nil {
@@ -81,6 +93,15 @@ var resumeCmd = &cobra.Command{
 
 		return syscall.Exec(claudePath, claudeArgs, env)
 	},
+}
+
+func findMatch(sessions []worktree.Session, query string) *worktree.Session {
+	for i := range sessions {
+		if sessions[i].Name == query || sessions[i].Branch == query {
+			return &sessions[i]
+		}
+	}
+	return nil
 }
 
 func setEnv(env []string, key, value string) []string {
