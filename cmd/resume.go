@@ -58,10 +58,17 @@ var resumeCmd = &cobra.Command{
 				seen[projRoot] = true
 				projSessions, err := worktree.ListSessions(projRoot)
 				if err != nil {
+					fmt.Fprintf(os.Stderr, "warning: skipping project %s: %v\n", proj.Path, err)
 					continue
 				}
 				if m := findMatch(projSessions, query); m != nil {
 					match = m
+					// Re-resolve the profile against the matched project's path,
+					// so the launched claude uses that project's credentials/settings
+					// rather than the CWD's.
+					if r, err := cfg.Resolve(proj.Path); err == nil {
+						result = r
+					}
 					break
 				}
 			}
