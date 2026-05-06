@@ -32,17 +32,20 @@ func Install() (string, error) {
 	return skillsDir, nil
 }
 
-// Ensure keeps every session directory symlinked to ~/.claude/skills, but
-// only if that directory already exists — skills are user-managed, so we
-// don't create an empty one on every resolve. Idempotent and cheap; errors
-// are swallowed so a transient filesystem issue can't block launching claude.
+// Ensure creates ~/.claude/skills if missing and keeps every session directory
+// symlinked to it. Idempotent and cheap to call on every resolve; errors are
+// swallowed so a transient filesystem issue can't block launching claude.
 func Ensure() {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return
 	}
 	skillsDir := filepath.Join(home, ".claude", "skills")
-	if _, err := os.Stat(skillsDir); err != nil {
+
+	// MkdirAll is a no-op when the directory already exists, so we call it
+	// unconditionally — a bare os.Stat guard would miss the case where
+	// skillsDir is itself a symlink to a missing target.
+	if err := os.MkdirAll(skillsDir, 0755); err != nil {
 		return
 	}
 
@@ -76,9 +79,14 @@ func ensureSessionSymlinks(skillsDir string) error {
 				errs = append(errs, fmt.Errorf("unexpected non-symlink at %s; refusing to overwrite", dst))
 				continue
 			}
-			if target, err := os.Readlink(dst); err == nil && target == skillsDir {
-				if _, err := os.Stat(dst); err == nil {
-					continue
+			if target, err := os.Readlink(dst); err == nil {
+				if !filepath.IsAbs(target) {
+					target = filepath.Join(filepath.Dir(dst), target)
+				}
+				if filepath.Clean(target) == skillsDir {
+					if _, err := os.Stat(dst); err == nil {
+						continue
+					}
 				}
 			}
 			if err := os.Remove(dst); err != nil {

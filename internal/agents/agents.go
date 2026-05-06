@@ -76,9 +76,14 @@ func ensureSessionSymlinks(agentsDir string) error {
 				errs = append(errs, fmt.Errorf("unexpected non-symlink at %s; refusing to overwrite", dst))
 				continue
 			}
-			if target, err := os.Readlink(dst); err == nil && target == agentsDir {
-				if _, err := os.Stat(dst); err == nil {
-					continue
+			if target, err := os.Readlink(dst); err == nil {
+				if !filepath.IsAbs(target) {
+					target = filepath.Join(filepath.Dir(dst), target)
+				}
+				if filepath.Clean(target) == agentsDir {
+					if _, err := os.Stat(dst); err == nil {
+						continue
+					}
 				}
 			}
 			if err := os.Remove(dst); err != nil {
