@@ -87,7 +87,7 @@ When a profile has **Always use worktree** enabled, Claude Code runs in an isola
 - **Resume** — resume any session by name or branch without manually navigating to the worktree
 - **Auto-fetch** — worktree mode fetches `origin/<default-branch>` before launching Claude, so worktrees start from an up-to-date base
 - **Slash commands** — `/llmux apply` and `/llmux unapply` work directly inside Claude Code sessions
-- **Skills & commands sync** — your global `~/.claude/skills/` and `~/.claude/commands/` are symlinked into every profile, so anything installed once is available everywhere
+- **Skills, commands & agents sync** — your global `~/.claude/skills/`, `~/.claude/commands/`, and `~/.claude/agents/` are symlinked into every profile, so anything installed once is available everywhere
 
 ### Customization
 
