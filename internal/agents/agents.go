@@ -32,20 +32,17 @@ func Install() (string, error) {
 	return agentsDir, nil
 }
 
-// Ensure creates ~/.claude/agents if missing and keeps every session directory
-// symlinked to it. Idempotent and cheap to call on every resolve; errors are
-// swallowed so a transient filesystem issue can't block launching claude.
+// Ensure keeps every session directory symlinked to ~/.claude/agents, but
+// only if that directory already exists — agents are user-managed, so we
+// don't create an empty one on every resolve. Idempotent and cheap; errors
+// are swallowed so a transient filesystem issue can't block launching claude.
 func Ensure() {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return
 	}
 	agentsDir := filepath.Join(home, ".claude", "agents")
-
-	// MkdirAll is a no-op when the directory already exists, so we call it
-	// unconditionally — a bare os.Stat guard would miss the case where
-	// agentsDir is itself a symlink to a missing target.
-	if err := os.MkdirAll(agentsDir, 0755); err != nil {
+	if _, err := os.Stat(agentsDir); err != nil {
 		return
 	}
 
@@ -53,9 +50,11 @@ func Ensure() {
 }
 
 // ensureSessionSymlinks creates an `agents` symlink in each session directory
-// that doesn't already have a valid one. Dangling symlinks (target missing)
-// are removed and recreated so moving ~/.claude/agents doesn't leave profiles
-// permanently broken. Idempotent.
+// that doesn't already have a valid one pointing at agentsDir. Wrong-target
+// or dangling symlinks are removed and recreated so moving ~/.claude/agents
+// doesn't leave profiles permanently broken. A non-symlink entry (real file
+// or directory) is left alone and reported as an error — we never destroy
+// user data. Idempotent.
 func ensureSessionSymlinks(agentsDir string) error {
 	sessionsDir := config.SessionsDir()
 	entries, err := os.ReadDir(sessionsDir)
@@ -72,11 +71,15 @@ func ensureSessionSymlinks(agentsDir string) error {
 			continue
 		}
 		dst := filepath.Join(sessionsDir, e.Name(), "agents")
-		if _, err := os.Lstat(dst); err == nil {
-			// Something exists at dst. If os.Stat resolves it, leave it
-			// alone; otherwise it's a dangling symlink — replace it.
-			if _, err := os.Stat(dst); err == nil {
+		if fi, err := os.Lstat(dst); err == nil {
+			if fi.Mode()&os.ModeSymlink == 0 {
+				errs = append(errs, fmt.Errorf("unexpected non-symlink at %s; refusing to overwrite", dst))
 				continue
+			}
+			if target, err := os.Readlink(dst); err == nil && target == agentsDir {
+				if _, err := os.Stat(dst); err == nil {
+					continue
+				}
 			}
 			if err := os.Remove(dst); err != nil {
 				errs = append(errs, fmt.Errorf("removing stale symlink %s: %w", dst, err))
