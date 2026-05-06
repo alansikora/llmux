@@ -1,0 +1,99 @@
+package agents
+
+import (
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/allskar/llmux/internal/config"
+)
+
+// Install ensures ~/.claude/agents exists and creates the agents symlink in
+// every existing session directory. Because llmux ships no agents of its own,
+// this is pure plumbing: each profile sees the user's global agents directory
+// through its own CLAUDE_CONFIG_DIR.
+// Returns the directory path that session symlinks target.
+func Install() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+
+	agentsDir := filepath.Join(home, ".claude", "agents")
+	if err := os.MkdirAll(agentsDir, 0755); err != nil {
+		return "", fmt.Errorf("creating agents directory: %w", err)
+	}
+
+	if err := ensureSessionSymlinks(agentsDir); err != nil {
+		return "", err
+	}
+
+	return agentsDir, nil
+}
+
+// Ensure keeps every session directory symlinked to ~/.claude/agents, but
+// only if that directory already exists — agents are user-managed, so we
+// don't create an empty one on every resolve. Idempotent and cheap; errors
+// are swallowed so a transient filesystem issue can't block launching claude.
+func Ensure() {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	agentsDir := filepath.Join(home, ".claude", "agents")
+	if _, err := os.Stat(agentsDir); err != nil {
+		return
+	}
+
+	ensureSessionSymlinks(agentsDir) //nolint:errcheck // best-effort on hot path
+}
+
+// ensureSessionSymlinks creates an `agents` symlink in each session directory
+// that doesn't already have a valid one pointing at agentsDir. Wrong-target
+// or dangling symlinks are removed and recreated so moving ~/.claude/agents
+// doesn't leave profiles permanently broken. A non-symlink entry (real file
+// or directory) is left alone and reported as an error — we never destroy
+// user data. Idempotent.
+func ensureSessionSymlinks(agentsDir string) error {
+	sessionsDir := config.SessionsDir()
+	entries, err := os.ReadDir(sessionsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("reading sessions directory: %w", err)
+	}
+
+	var errs []error
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		dst := filepath.Join(sessionsDir, e.Name(), "agents")
+		if fi, err := os.Lstat(dst); err == nil {
+			if fi.Mode()&os.ModeSymlink == 0 {
+				errs = append(errs, fmt.Errorf("unexpected non-symlink at %s; refusing to overwrite", dst))
+				continue
+			}
+			if target, err := os.Readlink(dst); err == nil {
+				if !filepath.IsAbs(target) {
+					target = filepath.Join(filepath.Dir(dst), target)
+				}
+				if filepath.Clean(target) == agentsDir {
+					if _, err := os.Stat(dst); err == nil {
+						continue
+					}
+				}
+			}
+			if err := os.Remove(dst); err != nil {
+				errs = append(errs, fmt.Errorf("removing stale symlink %s: %w", dst, err))
+				continue
+			}
+		}
+		if err := os.Symlink(agentsDir, dst); err != nil {
+			errs = append(errs, fmt.Errorf("creating symlink %s: %w", dst, err))
+		}
+	}
+	return errors.Join(errs...)
+}

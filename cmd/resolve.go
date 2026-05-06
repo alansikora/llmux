@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/allskar/llmux/internal/agents"
 	"github.com/allskar/llmux/internal/claude"
 	"github.com/allskar/llmux/internal/commands"
 	"github.com/allskar/llmux/internal/config"
@@ -100,6 +101,7 @@ var resolveCmd = &cobra.Command{
 
 		commands.Ensure()
 		skills.Ensure()
+		agents.Ensure()
 
 		versionLine := "\033[90m↳ llmux " + DisplayVersion()
 		if latest := update.CheckUpdateNoticeCached(DisplayVersion()); latest != "" {

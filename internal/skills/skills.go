@@ -53,9 +53,11 @@ func Ensure() {
 }
 
 // ensureSessionSymlinks creates a `skills` symlink in each session directory
-// that doesn't already have a valid one. Dangling symlinks (target missing)
-// are removed and recreated so moving ~/.claude/skills doesn't leave profiles
-// permanently broken. Idempotent.
+// that doesn't already have a valid one pointing at skillsDir. Wrong-target
+// or dangling symlinks are removed and recreated so moving ~/.claude/skills
+// doesn't leave profiles permanently broken. A non-symlink entry (real file
+// or directory) is left alone and reported as an error — we never destroy
+// user data. Idempotent.
 func ensureSessionSymlinks(skillsDir string) error {
 	sessionsDir := config.SessionsDir()
 	entries, err := os.ReadDir(sessionsDir)
@@ -72,11 +74,20 @@ func ensureSessionSymlinks(skillsDir string) error {
 			continue
 		}
 		dst := filepath.Join(sessionsDir, e.Name(), "skills")
-		if _, err := os.Lstat(dst); err == nil {
-			// Something exists at dst. If os.Stat resolves it, leave it
-			// alone; otherwise it's a dangling symlink — replace it.
-			if _, err := os.Stat(dst); err == nil {
+		if fi, err := os.Lstat(dst); err == nil {
+			if fi.Mode()&os.ModeSymlink == 0 {
+				errs = append(errs, fmt.Errorf("unexpected non-symlink at %s; refusing to overwrite", dst))
 				continue
+			}
+			if target, err := os.Readlink(dst); err == nil {
+				if !filepath.IsAbs(target) {
+					target = filepath.Join(filepath.Dir(dst), target)
+				}
+				if filepath.Clean(target) == skillsDir {
+					if _, err := os.Stat(dst); err == nil {
+						continue
+					}
+				}
 			}
 			if err := os.Remove(dst); err != nil {
 				errs = append(errs, fmt.Errorf("removing stale symlink %s: %w", dst, err))
