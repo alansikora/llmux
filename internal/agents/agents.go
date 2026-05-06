@@ -1,4 +1,4 @@
-package skills
+package agents
 
 import (
 	"errors"
@@ -9,9 +9,9 @@ import (
 	"github.com/allskar/llmux/internal/config"
 )
 
-// Install ensures ~/.claude/skills exists and creates the skills symlink in
-// every existing session directory. Because llmux ships no skills of its own,
-// this is pure plumbing: each profile sees the user's global skills directory
+// Install ensures ~/.claude/agents exists and creates the agents symlink in
+// every existing session directory. Because llmux ships no agents of its own,
+// this is pure plumbing: each profile sees the user's global agents directory
 // through its own CLAUDE_CONFIG_DIR.
 // Returns the directory path that session symlinks target.
 func Install() (string, error) {
@@ -20,20 +20,20 @@ func Install() (string, error) {
 		return "", err
 	}
 
-	skillsDir := filepath.Join(home, ".claude", "skills")
-	if err := os.MkdirAll(skillsDir, 0755); err != nil {
-		return "", fmt.Errorf("creating skills directory: %w", err)
+	agentsDir := filepath.Join(home, ".claude", "agents")
+	if err := os.MkdirAll(agentsDir, 0755); err != nil {
+		return "", fmt.Errorf("creating agents directory: %w", err)
 	}
 
-	if err := ensureSessionSymlinks(skillsDir); err != nil {
+	if err := ensureSessionSymlinks(agentsDir); err != nil {
 		return "", err
 	}
 
-	return skillsDir, nil
+	return agentsDir, nil
 }
 
-// Ensure keeps every session directory symlinked to ~/.claude/skills, but
-// only if that directory already exists — skills are user-managed, so we
+// Ensure keeps every session directory symlinked to ~/.claude/agents, but
+// only if that directory already exists — agents are user-managed, so we
 // don't create an empty one on every resolve. Idempotent and cheap; errors
 // are swallowed so a transient filesystem issue can't block launching claude.
 func Ensure() {
@@ -41,21 +41,21 @@ func Ensure() {
 	if err != nil {
 		return
 	}
-	skillsDir := filepath.Join(home, ".claude", "skills")
-	if _, err := os.Stat(skillsDir); err != nil {
+	agentsDir := filepath.Join(home, ".claude", "agents")
+	if _, err := os.Stat(agentsDir); err != nil {
 		return
 	}
 
-	ensureSessionSymlinks(skillsDir) //nolint:errcheck // best-effort on hot path
+	ensureSessionSymlinks(agentsDir) //nolint:errcheck // best-effort on hot path
 }
 
-// ensureSessionSymlinks creates a `skills` symlink in each session directory
-// that doesn't already have a valid one pointing at skillsDir. Wrong-target
-// or dangling symlinks are removed and recreated so moving ~/.claude/skills
+// ensureSessionSymlinks creates an `agents` symlink in each session directory
+// that doesn't already have a valid one pointing at agentsDir. Wrong-target
+// or dangling symlinks are removed and recreated so moving ~/.claude/agents
 // doesn't leave profiles permanently broken. A non-symlink entry (real file
 // or directory) is left alone and reported as an error — we never destroy
 // user data. Idempotent.
-func ensureSessionSymlinks(skillsDir string) error {
+func ensureSessionSymlinks(agentsDir string) error {
 	sessionsDir := config.SessionsDir()
 	entries, err := os.ReadDir(sessionsDir)
 	if err != nil {
@@ -70,13 +70,13 @@ func ensureSessionSymlinks(skillsDir string) error {
 		if !e.IsDir() {
 			continue
 		}
-		dst := filepath.Join(sessionsDir, e.Name(), "skills")
+		dst := filepath.Join(sessionsDir, e.Name(), "agents")
 		if fi, err := os.Lstat(dst); err == nil {
 			if fi.Mode()&os.ModeSymlink == 0 {
 				errs = append(errs, fmt.Errorf("unexpected non-symlink at %s; refusing to overwrite", dst))
 				continue
 			}
-			if target, err := os.Readlink(dst); err == nil && target == skillsDir {
+			if target, err := os.Readlink(dst); err == nil && target == agentsDir {
 				if _, err := os.Stat(dst); err == nil {
 					continue
 				}
@@ -86,7 +86,7 @@ func ensureSessionSymlinks(skillsDir string) error {
 				continue
 			}
 		}
-		if err := os.Symlink(skillsDir, dst); err != nil {
+		if err := os.Symlink(agentsDir, dst); err != nil {
 			errs = append(errs, fmt.Errorf("creating symlink %s: %w", dst, err))
 		}
 	}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/allskar/llmux/internal/agents"
 	"github.com/allskar/llmux/internal/commands"
 	"github.com/allskar/llmux/internal/config"
 	"github.com/allskar/llmux/internal/shell"
@@ -58,6 +59,12 @@ var initCmd = &cobra.Command{
 			return err
 		}
 		fmt.Printf("Linked Claude Code skills from %s\n", skillsDir)
+
+		agentsDir, err := agents.Install()
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Linked Claude Code agents from %s\n", agentsDir)
 		return nil
 	},
 }

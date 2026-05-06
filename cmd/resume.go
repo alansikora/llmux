@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"syscall"
 
+	"github.com/allskar/llmux/internal/agents"
 	"github.com/allskar/llmux/internal/commands"
 	"github.com/allskar/llmux/internal/config"
 	"github.com/allskar/llmux/internal/skills"
@@ -88,6 +89,7 @@ var resumeCmd = &cobra.Command{
 		config.SyncProfileSettings(cfg, result.ProfileName) //nolint:errcheck
 		commands.Ensure()
 		skills.Ensure()
+		agents.Ensure()
 
 		env := os.Environ()
 		env = setEnv(env, "CLAUDE_CONFIG_DIR", result.SessionDir)
