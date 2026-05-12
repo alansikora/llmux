@@ -18,13 +18,26 @@ type Session struct {
 	Name          string
 	Branch        string
 	ChangedFiles  int
-	LastActivity  time.Time
+	LastCommit    time.Time
+	LastClaudeRun time.Time
 	Path          string
 	WorkspacePath string
 }
 
+// LastActivity is the most recent signal of activity in the session:
+// either a git commit on its branch or a Claude turn writing to the
+// session transcript. This is what should drive staleness and sort order —
+// a session can be actively in use with no recent commits.
+func (s Session) LastActivity() time.Time {
+	if s.LastClaudeRun.After(s.LastCommit) {
+		return s.LastClaudeRun
+	}
+	return s.LastCommit
+}
+
 func (s Session) IsStale() bool {
-	return !s.LastActivity.IsZero() && time.Since(s.LastActivity) > StaleDuration
+	t := s.LastActivity()
+	return !t.IsZero() && time.Since(t) > StaleDuration
 }
 
 func WorktreesDir(workspacePath string) string {
@@ -71,6 +84,10 @@ func ListSessions(workspacePath string) ([]Session, error) {
 		names = append(names, entry.Name())
 	}
 
+	// Pre-scan Claude transcripts once so each session goroutine just does
+	// a map lookup instead of walking every profile's project dir itself.
+	transcriptIndex := buildClaudeTranscriptIndex()
+
 	// Fetch per-session metadata in parallel. Each session requires 3
 	// sequential git calls (branch, diff-stat, last-activity), so we run
 	// one goroutine per session to maximise concurrency.
@@ -102,10 +119,10 @@ func ListSessions(workspacePath string) ([]Session, error) {
 				}
 			}
 
-			var lastActivity time.Time
+			var lastCommit time.Time
 			if ts, err := runGit(wtPath, "log", "-1", "--format=%ct"); err == nil {
 				if epoch, err := strconv.ParseInt(strings.TrimSpace(ts), 10, 64); err == nil {
-					lastActivity = time.Unix(epoch, 0)
+					lastCommit = time.Unix(epoch, 0)
 				}
 			}
 
@@ -113,7 +130,8 @@ func ListSessions(workspacePath string) ([]Session, error) {
 				Name:          name,
 				Branch:        trimmedBranch,
 				ChangedFiles:  changedFiles,
-				LastActivity:  lastActivity,
+				LastCommit:    lastCommit,
+				LastClaudeRun: transcriptIndex[encodeClaudeProjectPath(wtPath)],
 				Path:          wtPath,
 				WorkspacePath: workspacePath,
 			}
@@ -131,7 +149,7 @@ func ListSessions(workspacePath string) ([]Session, error) {
 	}
 
 	sort.Slice(sessions, func(i, j int) bool {
-		return sessions[i].LastActivity.After(sessions[j].LastActivity)
+		return sessions[i].LastActivity().After(sessions[j].LastActivity())
 	})
 
 	return sessions, nil
