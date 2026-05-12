@@ -21,42 +21,55 @@ func encodeClaudeProjectPath(p string) string {
 	return p
 }
 
-// latestClaudeTranscriptMtime returns the most recent mtime among Claude
-// transcript files (`*.jsonl`) for the given worktree path, across every
-// llmux profile. Returns the zero time if no transcript directory exists.
+// buildClaudeTranscriptIndex walks every profile's `projects/` directory
+// once and returns a map from Claude-encoded project path to the newest
+// `*.jsonl` mtime found across all profiles. Callers do a single map
+// lookup per session instead of re-scanning the sessions dir per session.
 //
-// Claude appends to the JSONL on every turn, so this mtime directly tracks
-// when the user/agent last did anything in the session.
-func latestClaudeTranscriptMtime(worktreePath string) time.Time {
-	encoded := encodeClaudeProjectPath(worktreePath)
+// Claude appends to the JSONL on every turn, so the indexed mtime
+// directly tracks when the user/agent last did anything in the session.
+func buildClaudeTranscriptIndex() map[string]time.Time {
+	index := map[string]time.Time{}
 	sessionsDir := config.SessionsDir()
 	profiles, err := os.ReadDir(sessionsDir)
 	if err != nil {
-		return time.Time{}
+		return index
 	}
 
-	var latest time.Time
 	for _, pf := range profiles {
 		if !pf.IsDir() {
 			continue
 		}
-		projDir := filepath.Join(sessionsDir, pf.Name(), "projects", encoded)
-		entries, err := os.ReadDir(projDir)
+		projectsDir := filepath.Join(sessionsDir, pf.Name(), "projects")
+		projDirs, err := os.ReadDir(projectsDir)
 		if err != nil {
 			continue
 		}
-		for _, e := range entries {
-			if e.IsDir() || !strings.HasSuffix(e.Name(), ".jsonl") {
+		for _, pd := range projDirs {
+			if !pd.IsDir() {
 				continue
 			}
-			info, err := e.Info()
+			entries, err := os.ReadDir(filepath.Join(projectsDir, pd.Name()))
 			if err != nil {
 				continue
 			}
-			if info.ModTime().After(latest) {
-				latest = info.ModTime()
+			var latest time.Time
+			for _, e := range entries {
+				if e.IsDir() || !strings.HasSuffix(e.Name(), ".jsonl") {
+					continue
+				}
+				info, err := e.Info()
+				if err != nil {
+					continue
+				}
+				if info.ModTime().After(latest) {
+					latest = info.ModTime()
+				}
+			}
+			if latest.After(index[pd.Name()]) {
+				index[pd.Name()] = latest
 			}
 		}
 	}
-	return latest
+	return index
 }

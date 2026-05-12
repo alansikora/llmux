@@ -84,6 +84,10 @@ func ListSessions(workspacePath string) ([]Session, error) {
 		names = append(names, entry.Name())
 	}
 
+	// Pre-scan Claude transcripts once so each session goroutine just does
+	// a map lookup instead of walking every profile's project dir itself.
+	transcriptIndex := buildClaudeTranscriptIndex()
+
 	// Fetch per-session metadata in parallel. Each session requires 3
 	// sequential git calls (branch, diff-stat, last-activity), so we run
 	// one goroutine per session to maximise concurrency.
@@ -127,7 +131,7 @@ func ListSessions(workspacePath string) ([]Session, error) {
 				Branch:        trimmedBranch,
 				ChangedFiles:  changedFiles,
 				LastCommit:    lastCommit,
-				LastClaudeRun: latestClaudeTranscriptMtime(wtPath),
+				LastClaudeRun: transcriptIndex[encodeClaudeProjectPath(wtPath)],
 				Path:          wtPath,
 				WorkspacePath: workspacePath,
 			}
