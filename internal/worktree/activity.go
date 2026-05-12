@@ -29,7 +29,8 @@ func encodeClaudeProjectPath(p string) string {
 // when the user/agent last did anything in the session.
 func latestClaudeTranscriptMtime(worktreePath string) time.Time {
 	encoded := encodeClaudeProjectPath(worktreePath)
-	profiles, err := os.ReadDir(config.SessionsDir())
+	sessionsDir := config.SessionsDir()
+	profiles, err := os.ReadDir(sessionsDir)
 	if err != nil {
 		return time.Time{}
 	}
@@ -39,7 +40,7 @@ func latestClaudeTranscriptMtime(worktreePath string) time.Time {
 		if !pf.IsDir() {
 			continue
 		}
-		projDir := filepath.Join(config.SessionsDir(), pf.Name(), "projects", encoded)
+		projDir := filepath.Join(sessionsDir, pf.Name(), "projects", encoded)
 		entries, err := os.ReadDir(projDir)
 		if err != nil {
 			continue
